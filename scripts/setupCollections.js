@@ -1,4 +1,4 @@
-// scripts/setupMaintenanceCollections.js
+// scripts/setupCollections.js - Обновленная версия для системы конференций
 const { Client, Databases, Permission, Role } = require("node-appwrite");
 require("dotenv").config({ path: ".env.local" });
 
@@ -9,18 +9,19 @@ const appwriteConfig = {
   databaseId: process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || "",
   collections: {
     users: process.env.NEXT_PUBLIC_USERS_COLLECTION_ID || "users",
-    maintenanceRequests:
-      process.env.NEXT_PUBLIC_MAINTENANCE_REQUESTS_COLLECTION_ID ||
-      "maintenance_requests",
-    requestComments:
-      process.env.NEXT_PUBLIC_REQUEST_COMMENTS_COLLECTION_ID ||
-      "request_comments",
-    requestHistory:
-      process.env.NEXT_PUBLIC_REQUEST_HISTORY_COLLECTION_ID ||
-      "request_history",
-    requestAttachments:
-      process.env.NEXT_PUBLIC_REQUEST_ATTACHMENTS_COLLECTION_ID ||
-      "request_attachments",
+    conferences:
+      process.env.NEXT_PUBLIC_CONFERENCES_COLLECTION_ID || "conferences",
+    applications:
+      process.env.NEXT_PUBLIC_APPLICATIONS_COLLECTION_ID || "applications",
+    applicationComments:
+      process.env.NEXT_PUBLIC_APPLICATION_COMMENTS_COLLECTION_ID ||
+      "application_comments",
+    applicationHistory:
+      process.env.NEXT_PUBLIC_APPLICATION_HISTORY_COLLECTION_ID ||
+      "application_history",
+    conferenceSchedule:
+      process.env.NEXT_PUBLIC_CONFERENCE_SCHEDULE_COLLECTION_ID ||
+      "conference_schedule",
   },
 };
 
@@ -31,64 +32,113 @@ const COLLECTION_SCHEMAS = {
     role: {
       type: "enum",
       required: true,
-      elements: ["SUPER_ADMIN", "MANAGER", "TECHNICIAN", "REQUESTER"],
+      elements: ["SUPER_ADMIN", "ORGANIZER", "REVIEWER", "PARTICIPANT"],
     },
     isActive: { type: "boolean", required: false, default: false },
-    specialization: { type: "string", required: false, size: 255 },
+    organization: { type: "string", required: false, size: 255 },
+    position: { type: "string", required: false, size: 255 },
+    bio: { type: "string", required: false, size: 2000 },
     phone: { type: "string", required: false, size: 50 },
+    orcid: { type: "string", required: false, size: 50 },
+    website: { type: "url", required: false, size: 500 },
     createdAt: { type: "datetime", required: true },
-    createdBy: { type: "string", required: false },
   },
 
-  maintenanceRequests: {
+  conferences: {
     title: { type: "string", required: true, size: 255 },
-    description: { type: "string", required: true, size: 2000 },
-    category: {
+    description: { type: "string", required: true, size: 5000 },
+    theme: {
       type: "enum",
       required: true,
       elements: [
-        "ELECTRICAL",
-        "PLUMBING",
-        "HVAC",
-        "CARPENTRY",
-        "PAINTING",
-        "CLEANING",
+        "COMPUTER_SCIENCE",
+        "MEDICINE",
+        "EDUCATION",
+        "ENGINEERING",
+        "BUSINESS",
+        "SOCIAL_SCIENCES",
+        "NATURAL_SCIENCES",
+        "HUMANITIES",
         "OTHER",
       ],
     },
-    priority: {
-      type: "enum",
-      required: true,
-      elements: ["LOW", "MEDIUM", "HIGH", "URGENT"],
-    },
-    status: {
-      type: "enum",
-      required: true,
-      elements: ["NEW", "IN_PROGRESS", "COMPLETED", "CLOSED"],
-      default: "NEW",
-    },
+    startDate: { type: "datetime", required: true },
+    endDate: { type: "datetime", required: true },
+    submissionDeadline: { type: "datetime", required: true },
     location: { type: "string", required: true, size: 500 },
-    requesterId: { type: "string", required: true, size: 36 },
-    assignedTechnicianId: { type: "string", required: false, size: 36 },
-    managerId: { type: "string", required: false, size: 36 },
-    attachments: { type: "string", required: false, array: true },
-    estimatedCompletionDate: { type: "datetime", required: false },
-    actualCompletionDate: { type: "datetime", required: false },
-    notes: { type: "string", required: false, size: 2000 },
-    cost: { type: "integer", required: false, min: 0 },
+    participationType: {
+      type: "enum",
+      required: true,
+      elements: ["ONLINE", "OFFLINE", "HYBRID"],
+    },
+    organizerId: { type: "string", required: true, size: 36 },
+    contactEmail: { type: "email", required: true, size: 320 },
+    website: { type: "url", required: false, size: 500 },
+    maxParticipants: { type: "integer", required: false, min: 1 },
+    registrationFee: { type: "integer", required: false, min: 0 },
+    isPublished: { type: "boolean", required: false, default: false },
+    requirements: { type: "string", required: false, size: 2000 },
+    tags: { type: "string", required: false, array: true },
     createdAt: { type: "datetime", required: true },
   },
 
-  requestComments: {
-    requestId: { type: "string", required: true, size: 36 },
+  applications: {
+    conferenceId: { type: "string", required: true, size: 36 },
+    participantId: { type: "string", required: true, size: 36 },
+    status: {
+      type: "enum",
+      required: true,
+      elements: [
+        "DRAFT",
+        "SUBMITTED",
+        "UNDER_REVIEW",
+        "ACCEPTED",
+        "REJECTED",
+        "WAITLIST",
+      ],
+      default: "DRAFT",
+    },
+    // Информация об участнике
+    fullName: { type: "string", required: true, size: 255 },
+    organization: { type: "string", required: true, size: 255 },
+    position: { type: "string", required: false, size: 255 },
+    email: { type: "email", required: true, size: 320 },
+    phone: { type: "string", required: false, size: 50 },
+    // Информация о докладе
+    hasPresentation: { type: "boolean", required: false, default: false },
+    presentationType: {
+      type: "enum",
+      required: false,
+      elements: ["ORAL", "POSTER", "WORKSHOP", "KEYNOTE", "PANEL"],
+    },
+    presentationTitle: { type: "string", required: false, size: 500 },
+    abstract: { type: "string", required: false, size: 5000 },
+    keywords: { type: "string", required: false, array: true },
+    // Дополнительная информация
+    dietaryRestrictions: { type: "string", required: false, size: 1000 },
+    accessibilityNeeds: { type: "string", required: false, size: 1000 },
+    accommodationNeeded: { type: "boolean", required: false, default: false },
+    // Рецензирование
+    assignedReviewerId: { type: "string", required: false, size: 36 },
+    reviewerComments: { type: "string", required: false, size: 2000 },
+    reviewDate: { type: "datetime", required: false },
+    // Сертификаты и участие
+    attended: { type: "boolean", required: false, default: false },
+    certificateIssued: { type: "boolean", required: false, default: false },
+    certificateUrl: { type: "url", required: false, size: 500 },
+    createdAt: { type: "datetime", required: true },
+  },
+
+  applicationComments: {
+    applicationId: { type: "string", required: true, size: 36 },
     authorId: { type: "string", required: true, size: 36 },
     text: { type: "string", required: true, size: 2000 },
     isInternal: { type: "boolean", required: false, default: false },
     createdAt: { type: "datetime", required: true },
   },
 
-  requestHistory: {
-    requestId: { type: "string", required: true, size: 36 },
+  applicationHistory: {
+    applicationId: { type: "string", required: true, size: 36 },
     userId: { type: "string", required: true, size: 36 },
     action: { type: "string", required: true, size: 255 },
     oldValue: { type: "string", required: false, size: 500 },
@@ -97,13 +147,10 @@ const COLLECTION_SCHEMAS = {
     createdAt: { type: "datetime", required: true },
   },
 
-  requestAttachments: {
-    requestId: { type: "string", required: true, size: 36 },
-    fileName: { type: "string", required: true, size: 255 },
-    fileUrl: { type: "url", required: true, size: 500 },
-    fileSize: { type: "integer", required: false, min: 0 },
-    mimeType: { type: "string", required: false, size: 100 },
-    uploadedBy: { type: "string", required: true, size: 36 },
+  conferenceSchedule: {
+    conferenceId: { type: "string", required: true, size: 36 },
+    date: { type: "datetime", required: true },
+    timeSlots: { type: "string", required: true, size: 10000 }, // JSON строка с массивом временных слотов
     createdAt: { type: "datetime", required: true },
   },
 };
@@ -113,38 +160,50 @@ const COLLECTION_INDEXES = {
     { key: "email", type: "unique" },
     { key: "role", type: "key" },
     { key: "isActive", type: "key" },
-    { key: "specialization", type: "key" },
+    { key: "organization", type: "key" },
   ],
 
-  maintenanceRequests: [
-    { key: "status", type: "key" },
-    { key: "category", type: "key" },
-    { key: "priority", type: "key" },
-    { key: "requesterId", type: "key" },
-    { key: "assignedTechnicianId", type: "key" },
-    { key: "managerId", type: "key" },
+  conferences: [
+    { key: "organizerId", type: "key" },
+    { key: "theme", type: "key" },
+    { key: "participationType", type: "key" },
+    { key: "isPublished", type: "key" },
+    { key: "startDate", type: "key" },
+    { key: "endDate", type: "key" },
+    { key: "submissionDeadline", type: "key" },
     { key: "createdAt", type: "key" },
-    { key: "estimatedCompletionDate", type: "key" },
-    { key: "actualCompletionDate", type: "key" },
   ],
 
-  requestComments: [
-    { key: "requestId", type: "key" },
+  applications: [
+    { key: "conferenceId", type: "key" },
+    { key: "participantId", type: "key" },
+    { key: "status", type: "key" },
+    { key: "assignedReviewerId", type: "key" },
+    { key: "hasPresentation", type: "key" },
+    { key: "presentationType", type: "key" },
+    { key: "createdAt", type: "key" },
+    { key: "reviewDate", type: "key" },
+    { key: "attended", type: "key" },
+    { key: "certificateIssued", type: "key" },
+  ],
+
+  applicationComments: [
+    { key: "applicationId", type: "key" },
     { key: "authorId", type: "key" },
     { key: "isInternal", type: "key" },
     { key: "createdAt", type: "key" },
   ],
 
-  requestHistory: [
-    { key: "requestId", type: "key" },
+  applicationHistory: [
+    { key: "applicationId", type: "key" },
     { key: "userId", type: "key" },
     { key: "action", type: "key" },
     { key: "createdAt", type: "key" },
   ],
 
-  requestAttachments: [
-    { key: "requestId", type: "key" },
-    { key: "uploadedBy", type: "key" },
+  conferenceSchedule: [
+    { key: "conferenceId", type: "key" },
+    { key: "date", type: "key" },
     { key: "createdAt", type: "key" },
   ],
 };
@@ -275,7 +334,7 @@ const createIndex = async (databaseId, collectionId, indexConfig) => {
 
 const setupCollections = async () => {
   try {
-    console.log("🚀 Начинаем создание коллекций для системы заявок...");
+    console.log("🚀 Начинаем создание коллекций для системы конференций...");
     console.log(
       "📋 Всего коллекций для создания:",
       Object.keys(COLLECTION_SCHEMAS).length
@@ -422,7 +481,7 @@ const checkEnvironment = () => {
 };
 
 const main = async () => {
-  console.log("🔧 Maintenance Requests System - Настройка базы данных\n");
+  console.log("🔧 Conference Management System - Настройка базы данных\n");
 
   checkEnvironment();
 
@@ -444,10 +503,13 @@ const main = async () => {
     default:
       console.log("📖 Использование:");
       console.log(
-        "  node scripts/setupMaintenanceCollections.js reset        - Удалить коллекции"
+        "  node scripts/setupCollections.js setup        - Создать коллекции"
       );
       console.log(
-        "  node scripts/setupMaintenanceCollections.js reset-setup  - Пересоздать коллекции"
+        "  node scripts/setupCollections.js reset        - Удалить коллекции"
+      );
+      console.log(
+        "  node scripts/setupCollections.js reset-setup  - Пересоздать коллекции"
       );
       break;
   }
