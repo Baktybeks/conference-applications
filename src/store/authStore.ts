@@ -1,4 +1,4 @@
-// src/store/authStore.ts
+// src/store/authStore.ts - ПОЛНОСТЬЮ ЗАМЕНИТЬ ФАЙЛ
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
@@ -6,14 +6,11 @@ import { User } from "@/types";
 
 interface AuthState {
   user: User | null;
-
-  // Действия
   setUser: (user: User) => void;
   clearUser: () => void;
   updateUser: (updates: Partial<User>) => void;
 }
 
-// Создаем хранилище с плагином persist
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -35,8 +32,19 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: "auth-storage", // Должно совпадать с именем в middleware
-      storage: createJSONStorage(() => localStorage),
+      name: "auth-storage",
+      storage: createJSONStorage(() => {
+        // Добавляем проверку на наличие localStorage для SSR
+        if (typeof window !== "undefined") {
+          return localStorage;
+        }
+        // Fallback для SSR
+        return {
+          getItem: () => null,
+          setItem: () => {},
+          removeItem: () => {},
+        };
+      }),
       partialize: (state) => ({
         user: state.user,
       }),

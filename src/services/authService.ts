@@ -1,4 +1,4 @@
-// src/services/authService.ts (Рефакторинг)
+// src/services/authService.ts (ПОЛНОСТЬЮ ЗАМЕНИТЬ ФАЙЛ)
 
 import { ID, Query, AppwriteException } from "appwrite";
 import { account, databases, appwriteHelpers } from "./appwriteClient";
@@ -17,19 +17,14 @@ export interface RegisterData {
   email: string;
   password: string;
   role: UserRole;
-  specialization?: string;
+  organization?: string;
   phone?: string;
-}
-
-interface NotActivatedUser {
-  notActivated: true;
-  message: string;
 }
 
 // API функции
 export const authApi = {
   // Получить текущего пользователя
-  getCurrentUser: async (): Promise<User | NotActivatedUser | null> => {
+  getCurrentUser: async (): Promise<User | null> => {
     try {
       // Проверяем сессию в Appwrite
       const appwriteUser = await account.get();
@@ -49,10 +44,9 @@ export const authApi = {
 
       // Проверяем активацию аккаунта
       if (!user.isActive) {
-        return {
-          notActivated: true,
-          message: "Ваш аккаунт еще не активирован администратором",
-        };
+        // Завершаем сессию для неактивированных пользователей
+        await account.deleteSession("current");
+        throw new Error("Ваш аккаунт еще не активирован администратором");
       }
 
       return user;
@@ -61,6 +55,12 @@ export const authApi = {
       if (error.code === 401) {
         return null;
       }
+
+      // Если аккаунт неактивирован
+      if (error.message?.includes("не активирован")) {
+        throw error;
+      }
+
       console.error("Ошибка при получении текущего пользователя:", error);
       throw appwriteHelpers.handleAppwriteError(error);
     }
@@ -77,12 +77,6 @@ export const authApi = {
 
       if (!currentUser) {
         throw new Error("Не удалось получить данные пользователя после входа");
-      }
-
-      if ("notActivated" in currentUser) {
-        // Завершаем сессию при неактивированном аккаунте
-        await account.deleteSession("current");
-        throw new Error(currentUser.message);
       }
 
       return currentUser;
@@ -118,7 +112,7 @@ export const authApi = {
     data: RegisterData
   ): Promise<{ user: User; isFirstUser: boolean }> => {
     try {
-      const { name, email, password, role, specialization, phone } = data;
+      const { name, email, password, role, organization, phone } = data;
 
       // Проверяем, первый ли это пользователь
       const adminCheck = await databases.listDocuments(
@@ -149,9 +143,8 @@ export const authApi = {
           email,
           role: finalRole,
           isActive: isAutoActivated,
-          specialization: specialization || null,
+          organization: organization || null,
           phone: phone || null,
-          createdAt: new Date().toISOString(),
         }
       );
 
@@ -211,26 +204,6 @@ export const authApi = {
     }
   },
 
-  // Получить активных техников
-  getActiveTechnicians: async (): Promise<User[]> => {
-    try {
-      const response = await databases.listDocuments(
-        appwriteConfig.databaseId,
-        appwriteConfig.collections.users,
-        [
-          Query.equal("role", UserRole.TECHNICIAN),
-          Query.equal("isActive", true),
-          Query.orderAsc("name"),
-        ]
-      );
-
-      return response.documents as unknown as User[];
-    } catch (error: any) {
-      console.error("Ошибка при получении техников:", error);
-      throw appwriteHelpers.handleAppwriteError(error);
-    }
-  },
-
   // Активировать пользователя
   activateUser: async (userId: string): Promise<User> => {
     try {
@@ -268,7 +241,7 @@ export const authApi = {
   // Создать пользователя (для админов)
   createUser: async (data: RegisterData): Promise<User> => {
     try {
-      const { name, email, password, role, specialization, phone } = data;
+      const { name, email, password, role, organization, phone } = data;
 
       // Создаем аккаунт в Appwrite Auth
       const appwriteUser = await account.create(
@@ -288,9 +261,8 @@ export const authApi = {
           email,
           role,
           isActive: true, // Пользователи, созданные админом, сразу активны
-          specialization: specialization || null,
+          organization: organization || null,
           phone: phone || null,
-          createdAt: new Date().toISOString(),
         }
       );
 
@@ -346,7 +318,6 @@ export const authKeys = {
   currentUser: () => [...authKeys.all, "current"] as const,
   users: () => [...authKeys.all, "users"] as const,
   pendingUsers: () => [...authKeys.all, "pending"] as const,
-  technicians: () => [...authKeys.all, "technicians"] as const,
   user: (id: string) => [...authKeys.users(), id] as const,
 };
 
@@ -359,8 +330,10 @@ export const useCurrentUser = () => {
     queryFn: authApi.getCurrentUser,
     staleTime: 1000 * 60 * 5, // 5 минут
     retry: (failureCount, error: any) => {
-      // Не повторяем запрос при 401 ошибке
-      if (error?.code === 401) return false;
+      // Не повторяем запрос при 401 ошибке или неактивированном аккаунте
+      if (error?.code === 401 || error?.message?.includes("не активирован")) {
+        return false;
+      }
       return failureCount < 2;
     },
   });
@@ -392,14 +365,22 @@ export const useLogout = () => {
   return useMutation({
     mutationFn: authApi.logout,
     onSuccess: () => {
-      // Очищаем весь кеш пользователя
+      // Очищаем кеш текущего пользователя
       queryClient.setQueryData(authKeys.currentUser(), null);
+
+      // Удаляем все auth-связанные запросы
       queryClient.removeQueries({ queryKey: authKeys.all });
-      // Сбрасываем кеш всех данных
-      queryClient.clear();
+
+      // Инвалидируем остальные запросы, чтобы они обновились при следующем входе
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          // Не инвалидируем auth запросы (они уже удалены)
+          return !query.queryKey[0]?.toString().startsWith("auth");
+        },
+      });
     },
     onError: () => {
-      // Очищаем кеш даже при ошибке (пользователь хочет выйти)
+      // Даже при ошибке очищаем auth данные
       queryClient.setQueryData(authKeys.currentUser(), null);
       queryClient.removeQueries({ queryKey: authKeys.all });
     },
@@ -442,15 +423,6 @@ export const usePendingUsers = () => {
   });
 };
 
-// Получение активных техников
-export const useActiveTechnicians = () => {
-  return useQuery({
-    queryKey: authKeys.technicians(),
-    queryFn: authApi.getActiveTechnicians,
-    staleTime: 1000 * 60 * 5, // 5 минут
-  });
-};
-
 // Активация пользователя
 export const useActivateUser = () => {
   const queryClient = useQueryClient();
@@ -461,7 +433,6 @@ export const useActivateUser = () => {
       // Инвалидируем списки пользователей
       queryClient.invalidateQueries({ queryKey: authKeys.users() });
       queryClient.invalidateQueries({ queryKey: authKeys.pendingUsers() });
-      queryClient.invalidateQueries({ queryKey: authKeys.technicians() });
     },
   });
 };
@@ -476,7 +447,6 @@ export const useDeactivateUser = () => {
       // Инвалидируем списки пользователей
       queryClient.invalidateQueries({ queryKey: authKeys.users() });
       queryClient.invalidateQueries({ queryKey: authKeys.pendingUsers() });
-      queryClient.invalidateQueries({ queryKey: authKeys.technicians() });
     },
   });
 };
@@ -490,7 +460,6 @@ export const useCreateUser = () => {
     onSuccess: () => {
       // Инвалидируем списки пользователей
       queryClient.invalidateQueries({ queryKey: authKeys.users() });
-      queryClient.invalidateQueries({ queryKey: authKeys.technicians() });
     },
   });
 };
@@ -521,7 +490,6 @@ export const useUpdateUserProfile = () => {
 
       // Инвалидируем списки
       queryClient.invalidateQueries({ queryKey: authKeys.users() });
-      queryClient.invalidateQueries({ queryKey: authKeys.technicians() });
     },
   });
 };
@@ -536,43 +504,6 @@ export const useDeleteUser = () => {
       // Инвалидируем все списки пользователей
       queryClient.invalidateQueries({ queryKey: authKeys.users() });
       queryClient.invalidateQueries({ queryKey: authKeys.pendingUsers() });
-      queryClient.invalidateQueries({ queryKey: authKeys.technicians() });
     },
   });
-};
-
-// Проверка прав доступа (хуки)
-
-export const usePermissions = () => {
-  const { data: user } = useCurrentUser();
-
-  // Приводим к типу User, если пользователь существует
-  const activatedUser = user as User | null;
-
-  return {
-    canManageUsers:
-      activatedUser?.role === UserRole.SUPER_ADMIN ||
-      activatedUser?.role === UserRole.MANAGER,
-    canManageRequests:
-      activatedUser?.role === UserRole.SUPER_ADMIN ||
-      activatedUser?.role === UserRole.MANAGER,
-    canAssignTechnicians:
-      activatedUser?.role === UserRole.SUPER_ADMIN ||
-      activatedUser?.role === UserRole.MANAGER,
-    canViewAllRequests:
-      activatedUser?.role === UserRole.SUPER_ADMIN ||
-      activatedUser?.role === UserRole.MANAGER,
-    canCreateRequests:
-      activatedUser?.role === UserRole.SUPER_ADMIN ||
-      activatedUser?.role === UserRole.MANAGER ||
-      activatedUser?.role === UserRole.REQUESTER,
-    canUpdateRequestStatus:
-      activatedUser?.role === UserRole.SUPER_ADMIN ||
-      activatedUser?.role === UserRole.MANAGER ||
-      activatedUser?.role === UserRole.TECHNICIAN,
-    isSuper: activatedUser?.role === UserRole.SUPER_ADMIN,
-    isManager: activatedUser?.role === UserRole.MANAGER,
-    isTechnician: activatedUser?.role === UserRole.TECHNICIAN,
-    isRequester: activatedUser?.role === UserRole.REQUESTER,
-  };
 };

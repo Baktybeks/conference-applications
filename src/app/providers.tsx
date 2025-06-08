@@ -1,12 +1,12 @@
-// app/providers.tsx
+// src/app/providers.tsx - ПОЛНОСТЬЮ ЗАМЕНИТЬ ФАЙЛ
+
 "use client";
 
 import React, { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { AxiosError } from "axios";
-import { useSyncAuthCookie } from "@/hooks/useSyncAuthCookie";
 import { ClientOnlyToastContainer } from "@/components/ClientOnlyToastContainer";
+import { useSyncAuthCookie } from "@/hooks/useSyncAuthCookie";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = React.useState(
@@ -16,14 +16,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
           queries: {
             refetchOnWindowFocus: false,
             retry: (failureCount, error) => {
-              if (
-                error instanceof AxiosError &&
-                error.response?.status === 429
-              ) {
-                return failureCount < 3;
+              // Обрабатываем ошибки Appwrite
+              if (error && typeof error === "object" && "code" in error) {
+                // Не повторяем запросы при ошибках авторизации
+                if (error.code === 401 || error.code === 403) {
+                  return false;
+                }
+
+                // Ограничиваем повторы для других ошибок
+                if (error.code === 429) {
+                  return failureCount < 3;
+                }
               }
-              return false;
+              return failureCount < 2;
             },
+            staleTime: 1000 * 60 * 5, // 5 минут
           },
         },
       })
@@ -36,6 +43,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     setIsClient(true);
   }, []);
 
+  // ИСПРАВЛЕНО: Подключаем синхронизацию auth cookie только на клиенте
   useSyncAuthCookie();
 
   return (
@@ -43,7 +51,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       {children}
       {/* Рендерим devtools только на клиенте в dev режиме */}
       {isClient && process.env.NODE_ENV === "development" && (
-        <ReactQueryDevtools />
+        <ReactQueryDevtools initialIsOpen={false} />
       )}
       <ClientOnlyToastContainer />
     </QueryClientProvider>

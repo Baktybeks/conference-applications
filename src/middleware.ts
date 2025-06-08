@@ -1,4 +1,4 @@
-// src/middleware.ts (обновленная версия)
+// src/middleware.ts - ПОЛНОСТЬЮ ЗАМЕНИТЬ ФАЙЛ
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -17,11 +17,12 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  const isAuthenticated = !!user;
+  // ИСПРАВЛЕНО: Более строгая проверка валидности пользователя
+  const isAuthenticated = !!user && user.$id && user.email && user.role;
   const isActive = user?.isActive === true;
   const path = request.nextUrl.pathname;
 
-  // Публичные страницы - логин и регистрация
+  // Публичные страницы
   if (path.startsWith("/login") || path.startsWith("/register")) {
     if (isAuthenticated && isActive) {
       return redirectByRole(user.role, request);
@@ -29,47 +30,36 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Если пользователь не авторизован или не активирован
+  // ИСПРАВЛЕНО: Проверка авторизации для защищенных маршрутов
   if (!isAuthenticated || !isActive) {
-    const loginUrl = new URL(request.nextUrl.origin);
-    loginUrl.pathname = "/login";
+    const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Защита маршрутов по ролям
-
-  // Супер админ - доступ ко всем маршрутам /admin
+  // Проверка прав доступа по ролям
   if (path.startsWith("/admin") && user.role !== UserRole.SUPER_ADMIN) {
     return redirectByRole(user.role, request);
   }
 
-  // Менеджер - доступ к маршрутам /manager
   if (
-    path.startsWith("/manager") &&
-    ![UserRole.SUPER_ADMIN, UserRole.MANAGER].includes(user.role)
+    path.startsWith("/organizer") &&
+    ![UserRole.SUPER_ADMIN, UserRole.ORGANIZER].includes(user.role)
   ) {
     return redirectByRole(user.role, request);
   }
 
-  // Техник - доступ к маршрутам /technician
   if (
-    path.startsWith("/technician") &&
-    ![UserRole.SUPER_ADMIN, UserRole.TECHNICIAN].includes(user.role)
+    path.startsWith("/reviewer") &&
+    ![UserRole.SUPER_ADMIN, UserRole.REVIEWER].includes(user.role)
   ) {
     return redirectByRole(user.role, request);
   }
 
-  // Заявитель - доступ к маршрутам /requester
   if (
-    path.startsWith("/requester") &&
-    ![UserRole.SUPER_ADMIN, UserRole.REQUESTER].includes(user.role)
+    path.startsWith("/participant") &&
+    ![UserRole.SUPER_ADMIN, UserRole.PARTICIPANT].includes(user.role)
   ) {
     return redirectByRole(user.role, request);
-  }
-
-  // Общий дашборд - доступ для всех авторизованных пользователей
-  if (path.startsWith("/dashboard")) {
-    return NextResponse.next();
   }
 
   // Перенаправление с главной страницы
@@ -87,21 +77,20 @@ function redirectByRole(role: UserRole, request: NextRequest) {
     case UserRole.SUPER_ADMIN:
       path = "/admin";
       break;
-    case UserRole.MANAGER:
-      path = "/manager";
+    case UserRole.ORGANIZER:
+      path = "/organizer";
       break;
-    case UserRole.TECHNICIAN:
-      path = "/technician";
+    case UserRole.REVIEWER:
+      path = "/reviewer";
       break;
-    case UserRole.REQUESTER:
-      path = "/requester";
+    case UserRole.PARTICIPANT:
+      path = "/participant";
       break;
     default:
       path = "/login";
   }
 
-  const url = new URL(request.nextUrl.origin);
-  url.pathname = path;
+  const url = new URL(path, request.url);
   return NextResponse.redirect(url);
 }
 
@@ -109,10 +98,9 @@ export const config = {
   matcher: [
     "/((?!api|_next/static|_next/image|public|favicon.ico).*)",
     "/admin/:path*",
-    "/manager/:path*",
-    "/technician/:path*",
-    "/requester/:path*",
-    "/dashboard/:path*",
+    "/organizer/:path*",
+    "/reviewer/:path*",
+    "/participant/:path*",
     "/login",
     "/register",
     "/",
