@@ -81,14 +81,6 @@ export function middleware(request: NextRequest) {
     console.log("✅ Доступ к /organizer разрешен");
   }
 
-  if (path.startsWith("/reviewer")) {
-    if (![UserRole.SUPER_ADMIN, UserRole.REVIEWER].includes(user.role)) {
-      console.log("🚫 Недостаточно прав для /reviewer, перенаправляем по роли");
-      return redirectByRole(user.role, request);
-    }
-    console.log("✅ Доступ к /reviewer разрешен");
-  }
-
   if (path.startsWith("/participant")) {
     if (![UserRole.SUPER_ADMIN, UserRole.PARTICIPANT].includes(user.role)) {
       console.log(
@@ -120,10 +112,6 @@ function redirectByRole(role: UserRole, request: NextRequest) {
     case UserRole.ORGANIZER:
       targetPath = "/organizer";
       console.log("📋 Перенаправление ORGANIZER на /organizer");
-      break;
-    case UserRole.REVIEWER:
-      targetPath = "/reviewer";
-      console.log("✍️ Перенаправление REVIEWER на /reviewer");
       break;
     case UserRole.PARTICIPANT:
       targetPath = "/participant";

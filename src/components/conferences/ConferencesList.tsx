@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Conference,
   ConferenceTheme,
@@ -17,50 +17,78 @@ import {
   Edit,
   Eye,
   Plus,
+  Globe,
+  EyeOff,
+  Loader2,
 } from "lucide-react";
 
-// ИСПРАВЛЕНИЕ: Сделал onConferenceEdit опциональным
+// ИСПРАВЛЕНИЕ: Добавлен пропс для публикации
 interface ConferencesListProps {
   onConferenceClick: (conference: Conference) => void;
-  onConferenceEdit?: (conference: Conference) => void; // ИСПРАВЛЕНИЕ: Теперь опциональный
+  onConferenceEdit?: (conference: Conference) => void;
+  onConferencePublish?: (conference: Conference) => void; // ДОБАВЛЕНО: Новый пропс
   showFilters?: boolean;
   initialFilters?: Partial<ConferenceFilters>;
   variant?: "admin" | "organizer" | "participant";
   showCreateButton?: boolean;
-  showEditButton?: boolean; // ДОБАВЛЕНО: Контроль отображения кнопки редактирования
+  showEditButton?: boolean;
+  showPublishButton?: boolean; // ДОБАВЛЕНО: Контроль отображения кнопки публикации
   conferences?: Conference[];
+  isLoading?: boolean; // ДОБАВЛЕНО: Для показа состояния загрузки
 }
 
 export function ConferencesList({
   onConferenceClick,
-  onConferenceEdit, // Может быть undefined
+  onConferenceEdit,
+  onConferencePublish, // ДОБАВЛЕНО
   showFilters = false,
   initialFilters = {},
   variant = "admin",
   showCreateButton = true,
-  showEditButton = true, // ДОБАВЛЕНО: По умолчанию показывать кнопку редактирования
+  showEditButton = true,
+  showPublishButton = false, // ДОБАВЛЕНО: По умолчанию отключена
   conferences: externalConferences,
+  isLoading = false, // ДОБАВЛЕНО
 }: ConferencesListProps) {
+  // Мемоизируем initialFilters для избежания бесконечного цикла
+  const memoizedInitialFilters = useMemo(
+    () => initialFilters,
+    [
+      initialFilters.searchQuery,
+      initialFilters.theme,
+      initialFilters.participationType,
+      initialFilters.isPublished,
+      initialFilters.organizerId,
+      initialFilters.dateFrom,
+      initialFilters.dateTo,
+    ]
+  );
+
   const [filters, setFilters] = useState<ConferenceFilters>({
     searchQuery: "",
     theme: undefined,
     participationType: undefined,
     isPublished: undefined,
-    ...initialFilters,
+    ...memoizedInitialFilters,
   });
 
   const [searchQuery, setSearchQuery] = useState(filters.searchQuery || "");
+  const [publishingStates, setPublishingStates] = useState<
+    Record<string, boolean>
+  >({}); // ДОБАВЛЕНО: Состояния загрузки публикации
 
   // Применяем начальные фильтры при изменении initialFilters
   useEffect(() => {
-    setFilters((prev) => ({ ...prev, ...initialFilters }));
-  }, [initialFilters]);
+    setFilters((prev) => ({ ...prev, ...memoizedInitialFilters }));
+  }, [memoizedInitialFilters]);
 
   // ИСПРАВЛЕНИЕ: Автоматически определяем настройки для участника
   const isParticipantView = variant === "participant";
   const shouldShowEditButton =
     showEditButton && !isParticipantView && onConferenceEdit;
   const shouldShowCreateButton = showCreateButton && !isParticipantView;
+  const shouldShowPublishButton =
+    showPublishButton && variant === "admin" && onConferencePublish; // ДОБАВЛЕНО
 
   // TODO: Получить реальные данные конференций с учетом фильтров
   const getAllConferences = (): Conference[] => {
@@ -86,7 +114,6 @@ export function ConferencesList({
         isPublished: true,
         requirements: "Научная степень или опыт работы в области медицины/ИИ",
         tags: ["AI", "Healthcare", "Machine Learning"],
-        createdAt: "2024-01-01T00:00:00Z",
       },
       {
         $id: "2",
@@ -109,7 +136,6 @@ export function ConferencesList({
         isPublished: true,
         requirements: "Опыт работы в сфере образования",
         tags: ["Education", "Digital", "Online Learning"],
-        createdAt: "2024-01-05T00:00:00Z",
       },
       {
         $id: "3",
@@ -128,11 +154,10 @@ export function ConferencesList({
         contactEmail: "info@greeneng2024.org",
         website: "https://greeneng2024.org",
         registrationFee: 0,
-        isPublished: true, // ИСПРАВЛЕНИЕ: Для участников показываем только опубликованные
+        isPublished: false, // ДОБАВЛЕНО: Черновик для демонстрации кнопки публикации
         requirements:
           "Инженерное образование или опыт в области экологических технологий",
         tags: ["Engineering", "Ecology", "Sustainability"],
-        createdAt: "2024-01-10T00:00:00Z",
       },
       {
         $id: "4",
@@ -152,10 +177,9 @@ export function ConferencesList({
         website: "https://blockchainbiz2024.com",
         maxParticipants: 250,
         registrationFee: 12000,
-        isPublished: true,
+        isPublished: false, // ДОБАВЛЕНО: Еще один черновик
         requirements: "Опыт в IT или финансовой сфере",
         tags: ["Blockchain", "Business", "Fintech"],
-        createdAt: "2024-01-15T00:00:00Z",
       },
     ];
 
@@ -282,38 +306,67 @@ export function ConferencesList({
     return colors[theme] || "bg-gray-100 text-gray-800";
   };
 
-  // Обработчики изменения фильтров
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    setFilters((prev) => ({ ...prev, searchQuery: value }));
-  };
+  // ДОБАВЛЕНО: Обработчик публикации (мемоизированный)
+  const handlePublishClick = useCallback(
+    async (e: React.MouseEvent, conference: Conference) => {
+      e.stopPropagation();
+      if (!onConferencePublish) return;
 
-  const handleThemeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value as ConferenceTheme | "";
-    setFilters((prev) => ({ ...prev, theme: value || undefined }));
-  };
+      setPublishingStates((prev) => ({ ...prev, [conference.$id]: true }));
+      try {
+        await onConferencePublish(conference);
+      } finally {
+        setPublishingStates((prev) => ({ ...prev, [conference.$id]: false }));
+      }
+    },
+    [onConferencePublish]
+  );
 
-  const handleParticipationTypeChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const value = e.target.value as ParticipationType | "";
-    setFilters((prev) => ({ ...prev, participationType: value || undefined }));
-  };
+  // Обработчики изменения фильтров (мемоизированные)
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setSearchQuery(value);
+      setFilters((prev) => ({ ...prev, searchQuery: value }));
+    },
+    []
+  );
 
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setFilters((prev) => ({
-      ...prev,
-      isPublished: value === "" ? undefined : value === "true",
-    }));
-  };
+  const handleThemeChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value as ConferenceTheme | "";
+      setFilters((prev) => ({ ...prev, theme: value || undefined }));
+    },
+    []
+  );
 
-  const clearFilters = () => {
-    const clearedFilters = { ...initialFilters, searchQuery: "" };
+  const handleParticipationTypeChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value as ParticipationType | "";
+      setFilters((prev) => ({
+        ...prev,
+        participationType: value || undefined,
+      }));
+    },
+    []
+  );
+
+  const handleStatusChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value;
+      setFilters((prev) => ({
+        ...prev,
+        isPublished: value === "" ? undefined : value === "true",
+      }));
+    },
+    []
+  );
+
+  const clearFilters = useCallback(() => {
+    const clearedFilters = { ...memoizedInitialFilters, searchQuery: "" };
     setFilters(clearedFilters);
     setSearchQuery("");
-  };
+  }, [memoizedInitialFilters]);
 
   // ИСПРАВЛЕНИЕ: Адаптированные заголовки для разных ролей
   const getPageTitle = () => {
@@ -337,6 +390,16 @@ export function ConferencesList({
         return "Создать конференцию";
     }
   };
+
+  // ДОБАВЛЕНО: Показ состояния загрузки
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mr-3" />
+        <span className="text-gray-600">Загрузка конференций...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -507,7 +570,7 @@ export function ConferencesList({
                   </span>
                 </div>
 
-                {/* ИСПРАВЛЕНИЕ: Кнопки действий только если нужно */}
+                {/* Кнопки действий */}
                 <div className="flex space-x-1 ml-2">
                   <button
                     onClick={(e) => {
@@ -519,17 +582,44 @@ export function ConferencesList({
                   >
                     <Eye className="h-4 w-4" />
                   </button>
+
                   {/* ИСПРАВЛЕНИЕ: Кнопка редактирования только если разрешено */}
                   {shouldShowEditButton && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onConferenceEdit!(conference); // ! потому что мы проверили shouldShowEditButton
+                        onConferenceEdit!(conference);
                       }}
                       className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
                       title="Редактировать"
                     >
                       <Edit className="h-4 w-4" />
+                    </button>
+                  )}
+
+                  {/* ДОБАВЛЕНО: Кнопка публикации только для админа */}
+                  {shouldShowPublishButton && (
+                    <button
+                      onClick={(e) => handlePublishClick(e, conference)}
+                      disabled={publishingStates[conference.$id]}
+                      className={`p-2 transition-colors rounded-md ${
+                        conference.isPublished
+                          ? "text-white bg-green-600 hover:bg-green-700"
+                          : "text-white bg-gray-500 hover:bg-green-600"
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      title={
+                        conference.isPublished
+                          ? "Снять с публикации"
+                          : "Опубликовать конференцию"
+                      }
+                    >
+                      {publishingStates[conference.$id] ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : conference.isPublished ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Globe className="h-4 w-4" />
+                      )}
                     </button>
                   )}
                 </div>
@@ -592,25 +682,49 @@ export function ConferencesList({
 
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
               <div className="flex justify-between items-center">
-                {/* ИСПРАВЛЕНИЕ: Статус показываем только для не-участников */}
-                {!isParticipantView ? (
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      conference.isPublished
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {conference.isPublished ? "Опубликована" : "Черновик"}
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                    Доступна для подачи заявок
-                  </span>
-                )}
+                <div className="flex items-center space-x-2">
+                  {/* ИСПРАВЛЕНИЕ: Статус показываем только для не-участников */}
+                  {!isParticipantView ? (
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        conference.isPublished
+                          ? "bg-green-100 text-green-800"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      {conference.isPublished ? "Опубликована" : "Черновик"}
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                      Доступна для подачи заявок
+                    </span>
+                  )}
+
+                  {/* ДОБАВЛЕНО: Дополнительная кнопка публикации для черновиков */}
+                  {shouldShowPublishButton && !conference.isPublished && (
+                    <button
+                      onClick={(e) => handlePublishClick(e, conference)}
+                      disabled={publishingStates[conference.$id]}
+                      className="px-3 py-1 bg-indigo-600 text-white text-xs rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    >
+                      {publishingStates[conference.$id] ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          Публикуется...
+                        </>
+                      ) : (
+                        <>
+                          <Globe className="h-3 w-3 mr-1" />
+                          Опубликовать
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+
                 <span className="text-sm font-medium text-gray-900">
                   {conference.registrationFee > 0
-                    ? `${conference.registrationFee.toLocaleString()} ₽`
+                    ? `${conference.registrationFee.toLocaleString()} сом`
                     : "Бесплатно"}
                 </span>
               </div>

@@ -33,8 +33,7 @@ const mapUserDocument = (doc: any): User => {
     bio: doc.bio || "",
     phone: doc.phone || "",
     orcid: doc.orcid || "",
-    website: doc.website || "", // Fallback для отсутствующего поля
-    createdAt: doc.createdAt,
+    website: doc.website || "",
   };
 };
 
@@ -59,7 +58,6 @@ const mapConferenceDocument = (doc: any): Conference => {
     isPublished: doc.isPublished,
     requirements: doc.requirements || "",
     tags: doc.tags || [],
-    createdAt: doc.createdAt,
   };
 };
 
@@ -84,13 +82,7 @@ const mapApplicationDocument = (doc: any): Application => {
     dietaryRestrictions: doc.dietaryRestrictions || "",
     accessibilityNeeds: doc.accessibilityNeeds || "",
     accommodationNeeded: doc.accommodationNeeded,
-    assignedReviewerId: doc.assignedReviewerId,
-    reviewerComments: doc.reviewerComments || "",
-    reviewDate: doc.reviewDate,
     attended: doc.attended,
-    certificateIssued: doc.certificateIssued,
-    certificateUrl: doc.certificateUrl || "",
-    createdAt: doc.createdAt,
   };
 };
 
@@ -154,12 +146,12 @@ const cleanDocumentData = (data: any) => {
 // Функция создания документа пользователя
 export const createUserDocument = async (
   userId: string,
-  userData: Omit<User, "$id" | "$createdAt" | "$updatedAt">
+  userData: Omit<User, "$id" | "$updatedAt">
 ) => {
   try {
     const documentData = cleanDocumentData({
       ...userData,
-      createdAt: userData.createdAt || new Date().toISOString(),
+      createdAt: userData.$createdAt || new Date().toISOString(),
     });
 
     const response = await databases.createDocument(
@@ -320,12 +312,12 @@ export const updateUserRole = async (
 
 // Создание конференции
 export const createConference = async (
-  conferenceData: Omit<Conference, "$id" | "$createdAt" | "$updatedAt">
+  conferenceData: Omit<Conference, "$id" | "$updatedAt">
 ) => {
   try {
     const dataWithCreatedAt = {
       ...conferenceData,
-      createdAt: conferenceData.createdAt || new Date().toISOString(),
+      createdAt: conferenceData.$createdAt || new Date().toISOString(),
     };
 
     // Очищаем данные от невалидных URL
@@ -413,12 +405,12 @@ export const getConferenceById = async (
 
 // Создание заявки
 export const createApplication = async (
-  applicationData: Omit<Application, "$id" | "$createdAt" | "$updatedAt">
+  applicationData: Omit<Application, "$id" | "$updatedAt">
 ) => {
   try {
     const dataWithCreatedAt = {
       ...applicationData,
-      createdAt: applicationData.createdAt || new Date().toISOString(),
+      createdAt: applicationData.$createdAt || new Date().toISOString(),
     };
 
     const response = await databases.createDocument(
@@ -548,7 +540,6 @@ export const assignReviewer = async (
   reviewerId: string
 ): Promise<Application | null> => {
   return updateApplication(applicationId, {
-    assignedReviewerId: reviewerId,
     status: ApplicationStatus.UNDER_REVIEW,
   });
 };
@@ -561,10 +552,6 @@ export const updateApplicationStatus = async (
 ): Promise<Application | null> => {
   const updates: Partial<Application> = {
     status,
-    ...(comments && { reviewerComments: comments }),
-    ...(status !== ApplicationStatus.DRAFT && {
-      reviewDate: new Date().toISOString(),
-    }),
   };
 
   return updateApplication(applicationId, updates);

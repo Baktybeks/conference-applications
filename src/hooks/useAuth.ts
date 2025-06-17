@@ -8,7 +8,6 @@ import { updateAuthCookie } from "@/utils/cookieSync";
 import {
   canManageUsers,
   canManageConferences,
-  canReviewApplications,
   canSubmitApplications,
   canViewAllData,
   canCreateConferences,
@@ -27,7 +26,6 @@ interface AuthState {
 interface AuthPermissions {
   canManageUsers: boolean;
   canManageConferences: boolean;
-  canReviewApplications: boolean;
   canSubmitApplications: boolean;
   canViewAllData: boolean;
   canCreateConferences: boolean;
@@ -276,7 +274,6 @@ export function useAuth() {
       return {
         canManageUsers: false,
         canManageConferences: false,
-        canReviewApplications: false,
         canSubmitApplications: false,
         canViewAllData: false,
         canCreateConferences: false,
@@ -288,7 +285,6 @@ export function useAuth() {
     return {
       canManageUsers: canManageUsers(state.user.role),
       canManageConferences: canManageConferences(state.user.role),
-      canReviewApplications: canReviewApplications(state.user.role),
       canSubmitApplications: canSubmitApplications(state.user.role),
       canViewAllData: canViewAllData(state.user.role),
       canCreateConferences: canCreateConferences(state.user.role),
@@ -341,9 +337,8 @@ export function useAuth() {
 
       const rolePriorities = {
         [UserRole.PARTICIPANT]: 1,
-        [UserRole.REVIEWER]: 2,
-        [UserRole.ORGANIZER]: 3,
-        [UserRole.SUPER_ADMIN]: 4,
+        [UserRole.ORGANIZER]: 2,
+        [UserRole.SUPER_ADMIN]: 3,
       };
 
       return rolePriorities[state.user.role] >= rolePriorities[minimumRole];

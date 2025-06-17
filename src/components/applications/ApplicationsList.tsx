@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ConferenceApplication,
   ApplicationStatus,
   PresentationType,
   ApplicationFilters,
 } from "@/types";
+import { Button } from "@/components/ui/Button";
 import {
   FileText,
   User,
@@ -17,174 +18,94 @@ import {
   Edit,
   Eye,
   Plus,
+  Check,
+  X,
+  Loader2,
+  MessageSquare,
 } from "lucide-react";
 
-// ИСПРАВЛЕНИЕ: Обновленный интерфейс с поддержкой фильтров
+// ИСПРАВЛЕНИЕ: Обновленный интерфейс с поддержкой реальных действий
 interface ApplicationsListProps {
   onApplicationClick: (application: ConferenceApplication) => void;
-  onApplicationReview?: (application: ConferenceApplication) => void; // ИСПРАВЛЕНИЕ: Сделан опциональным
+  onApplicationReview?: (application: ConferenceApplication) => void;
+  onApplicationAccept?: (
+    applicationId: string,
+    comments?: string
+  ) => Promise<void>; // ДОБАВЛЕНО
+  onApplicationReject?: (
+    applicationId: string,
+    comments?: string
+  ) => Promise<void>; // ДОБАВЛЕНО
+  onApplicationWaitlist?: (
+    applicationId: string,
+    comments?: string
+  ) => Promise<void>; // ДОБАВЛЕНО
   showFilters?: boolean;
   showOrganizerActions?: boolean;
-  initialFilters?: Partial<ApplicationFilters>; // ИСПРАВЛЕНИЕ: Добавлен пропс initialFilters
+  initialFilters?: Partial<ApplicationFilters>;
   variant?: "admin" | "organizer" | "participant" | "reviewer";
-  applications?: ConferenceApplication[]; // Опциональный пропс для передачи данных извне
+  applications?: ConferenceApplication[]; // Реальные данные из API
   showCreateButton?: boolean;
+  isLoading?: boolean; // ДОБАВЛЕНО: состояние загрузки
 }
 
 export function ApplicationsList({
   onApplicationClick,
   onApplicationReview,
+  onApplicationAccept,
+  onApplicationReject,
+  onApplicationWaitlist,
   showFilters = false,
   showOrganizerActions = false,
   initialFilters = {},
   variant = "admin",
-  applications: externalApplications,
+  applications = [], // ИСПРАВЛЕНИЕ: По умолчанию пустой массив
   showCreateButton = false,
+  isLoading = false,
 }: ApplicationsListProps) {
-  // ИСПРАВЛЕНИЕ: Состояние для фильтров
+  // Мемоизируем initialFilters для избежания бесконечного цикла
+  const memoizedInitialFilters = useMemo(
+    () => initialFilters,
+    [
+      initialFilters.participantId,
+      initialFilters.conferenceId,
+      initialFilters.status,
+      initialFilters.searchQuery,
+      initialFilters.hasPresentation,
+      initialFilters.presentationType,
+      initialFilters.dateFrom,
+      initialFilters.dateTo,
+    ]
+  );
+
+  // Состояние для фильтров
   const [filters, setFilters] = useState<ApplicationFilters>({
     searchQuery: "",
     status: undefined,
     hasPresentation: undefined,
     presentationType: undefined,
-    ...initialFilters,
+    ...memoizedInitialFilters,
   });
 
   const [searchQuery, setSearchQuery] = useState(filters.searchQuery || "");
+  const [processingApplications, setProcessingApplications] = useState<
+    Record<string, string>
+  >({}); // ДОБАВЛЕНО: отслеживание обработки
 
   // Применяем начальные фильтры при изменении initialFilters
   useEffect(() => {
-    setFilters((prev) => ({ ...prev, ...initialFilters }));
-  }, [initialFilters]);
+    setFilters((prev) => ({ ...prev, ...memoizedInitialFilters }));
+  }, [memoizedInitialFilters]);
 
-  // ИСПРАВЛЕНИЕ: Автоматические настройки для разных ролей
+  // Автоматические настройки для разных ролей
   const isParticipantView = variant === "participant";
   const isReviewerView = variant === "reviewer";
-  const shouldShowReviewActions = onApplicationReview && !isParticipantView;
+  const shouldShowReviewActions =
+    (onApplicationAccept || onApplicationReject) && !isParticipantView;
 
-  // TODO: Получить реальные данные заявок с учетом фильтров
-  const getAllApplications = (): ConferenceApplication[] => {
-    const baseApplications: ConferenceApplication[] = [
-      {
-        $id: "1",
-        $createdAt: "2024-01-01T00:00:00Z",
-        $updatedAt: "2024-01-01T00:00:00Z",
-        conferenceId: "1",
-        participantId: initialFilters.participantId || "user1",
-        status: ApplicationStatus.UNDER_REVIEW,
-        fullName: "Иван Иванов",
-        organization: "МГУ",
-        position: "Профессор",
-        email: "ivanov@mgu.ru",
-        phone: "+7 999 123 45 67",
-        hasPresentation: true,
-        presentationType: PresentationType.ORAL,
-        presentationTitle: "Применение машинного обучения в диагностике",
-        abstract:
-          "В данной работе рассматривается применение современных методов машинного обучения для улучшения точности медицинской диагностики. Исследование включает анализ различных алгоритмов и их эффективности.",
-        keywords: ["ML", "Диагностика", "Медицина"],
-        dietaryRestrictions: "",
-        accessibilityNeeds: "",
-        accommodationNeeded: false,
-        assignedReviewerId: "reviewer1",
-        reviewerComments: "",
-        attended: false,
-        certificateIssued: false,
-        certificateUrl: "",
-        createdAt: "2024-01-01T00:00:00Z",
-      },
-      {
-        $id: "2",
-        $createdAt: "2024-01-02T00:00:00Z",
-        $updatedAt: "2024-01-02T00:00:00Z",
-        conferenceId: "2",
-        participantId: initialFilters.participantId || "user2",
-        status: ApplicationStatus.ACCEPTED,
-        fullName: "Мария Петрова",
-        organization: "СПбГУ",
-        position: "Доцент",
-        email: "petrova@spbu.ru",
-        phone: "+7 999 876 54 32",
-        hasPresentation: true,
-        presentationType: PresentationType.POSTER,
-        presentationTitle: "Анализ данных в нейронаучных исследованиях",
-        abstract:
-          "Представленное исследование посвящено разработке новых методов анализа нейронных данных с использованием современных статистических подходов.",
-        keywords: ["Нейронаука", "Анализ данных", "Статистика"],
-        dietaryRestrictions: "Вегетарианская диета",
-        accessibilityNeeds: "",
-        accommodationNeeded: true,
-        reviewerComments: "Отличная работа, принимаем с удовольствием",
-        reviewDate: "2024-01-15T10:30:00Z",
-        attended: false,
-        certificateIssued: false,
-        certificateUrl: "",
-        createdAt: "2024-01-02T00:00:00Z",
-      },
-      {
-        $id: "3",
-        $createdAt: "2024-01-03T00:00:00Z",
-        $updatedAt: "2024-01-03T00:00:00Z",
-        conferenceId: "1",
-        participantId: initialFilters.participantId || "user3",
-        status: ApplicationStatus.SUBMITTED,
-        fullName: "Александр Сидоров",
-        organization: "ИТМО",
-        position: "Аспирант",
-        email: "sidorov@itmo.ru",
-        phone: "",
-        hasPresentation: false,
-        presentationTitle: "",
-        abstract: "",
-        keywords: [],
-        dietaryRestrictions: "",
-        accessibilityNeeds: "",
-        accommodationNeeded: false,
-        reviewerComments: "",
-        attended: false,
-        certificateIssued: false,
-        certificateUrl: "",
-        createdAt: "2024-01-03T00:00:00Z",
-      },
-      {
-        $id: "4",
-        $createdAt: "2024-01-04T00:00:00Z",
-        $updatedAt: "2024-01-04T00:00:00Z",
-        conferenceId: "3",
-        participantId: initialFilters.participantId || "user1",
-        status: ApplicationStatus.REJECTED,
-        fullName: "Иван Иванов",
-        organization: "МГУ",
-        position: "Профессор",
-        email: "ivanov@mgu.ru",
-        phone: "+7 999 123 45 67",
-        hasPresentation: true,
-        presentationType: PresentationType.WORKSHOP,
-        presentationTitle: "Интерактивные методы обучения ИИ",
-        abstract:
-          "Мастер-класс по современным интерактивным подходам к обучению искусственного интеллекта.",
-        keywords: ["ИИ", "Обучение", "Интерактив"],
-        dietaryRestrictions: "",
-        accessibilityNeeds: "",
-        accommodationNeeded: false,
-        reviewerComments:
-          "К сожалению, тема не соответствует направлению конференции",
-        reviewDate: "2024-01-20T14:15:00Z",
-        attended: false,
-        certificateIssued: false,
-        certificateUrl: "",
-        createdAt: "2024-01-04T00:00:00Z",
-      },
-    ];
-
-    return baseApplications;
-  };
-
-  // ИСПРАВЛЕНИЕ: Функция фильтрации заявок
+  // ИСПРАВЛЕНИЕ: Функция фильтрации заявок - теперь работает с реальными данными
   const getFilteredApplications = (): ConferenceApplication[] => {
-    const allApplications = externalApplications || getAllApplications();
-
-    return allApplications.filter((application) => {
+    return applications.filter((application) => {
       // Фильтр по участнику
       if (
         filters.participantId &&
@@ -197,14 +118,6 @@ export function ApplicationsList({
       if (
         filters.conferenceId &&
         application.conferenceId !== filters.conferenceId
-      ) {
-        return false;
-      }
-
-      // Фильтр по рецензенту
-      if (
-        filters.assignedReviewerId &&
-        application.assignedReviewerId !== filters.assignedReviewerId
       ) {
         return false;
       }
@@ -247,7 +160,7 @@ export function ApplicationsList({
 
       // Фильтр по дате (если указан)
       if (filters.dateFrom) {
-        const applicationDate = new Date(application.createdAt);
+        const applicationDate = new Date(application.$createdAt);
         const filterDate = new Date(filters.dateFrom);
         if (applicationDate < filterDate) {
           return false;
@@ -255,7 +168,7 @@ export function ApplicationsList({
       }
 
       if (filters.dateTo) {
-        const applicationDate = new Date(application.createdAt);
+        const applicationDate = new Date(application.$createdAt);
         const filterDate = new Date(filters.dateTo);
         if (applicationDate > filterDate) {
           return false;
@@ -268,7 +181,83 @@ export function ApplicationsList({
 
   const filteredApplications = getFilteredApplications();
 
-  // ИСПРАВЛЕНИЕ: Функции для правильной типизации
+  // ДОБАВЛЕНО: Обработчики действий с заявками
+  const handleAcceptApplication = async (applicationId: string) => {
+    if (!onApplicationAccept) return;
+
+    setProcessingApplications((prev) => ({
+      ...prev,
+      [applicationId]: "accepting",
+    }));
+    try {
+      await onApplicationAccept(applicationId);
+    } catch (error) {
+      console.error("Ошибка при принятии заявки:", error);
+    } finally {
+      setProcessingApplications((prev) => {
+        const newState = { ...prev };
+        delete newState[applicationId];
+        return newState;
+      });
+    }
+  };
+
+  const handleRejectApplication = async (applicationId: string) => {
+    if (!onApplicationReject) return;
+
+    setProcessingApplications((prev) => ({
+      ...prev,
+      [applicationId]: "rejecting",
+    }));
+    try {
+      await onApplicationReject(applicationId);
+    } catch (error) {
+      console.error("Ошибка при отклонении заявки:", error);
+    } finally {
+      setProcessingApplications((prev) => {
+        const newState = { ...prev };
+        delete newState[applicationId];
+        return newState;
+      });
+    }
+  };
+
+  const handleWaitlistApplication = async (applicationId: string) => {
+    if (!onApplicationWaitlist) return;
+
+    setProcessingApplications((prev) => ({
+      ...prev,
+      [applicationId]: "waitlisting",
+    }));
+    try {
+      await onApplicationWaitlist(applicationId);
+    } catch (error) {
+      console.error("Ошибка при добавлении в лист ожидания:", error);
+    } finally {
+      setProcessingApplications((prev) => {
+        const newState = { ...prev };
+        delete newState[applicationId];
+        return newState;
+      });
+    }
+  };
+
+  // ДОБАВЛЕНО: Функция для определения доступных действий
+  const getAvailableActions = (application: ConferenceApplication) => {
+    const canAccept =
+      application.status === ApplicationStatus.SUBMITTED ||
+      application.status === ApplicationStatus.UNDER_REVIEW;
+    const canReject =
+      application.status === ApplicationStatus.SUBMITTED ||
+      application.status === ApplicationStatus.UNDER_REVIEW;
+    const canWaitlist =
+      application.status === ApplicationStatus.SUBMITTED ||
+      application.status === ApplicationStatus.UNDER_REVIEW;
+
+    return { canAccept, canReject, canWaitlist };
+  };
+
+  // Функции для правильной типизации
   const getStatusColor = (status: ApplicationStatus): string => {
     const colors: Record<ApplicationStatus, string> = {
       [ApplicationStatus.DRAFT]: "bg-gray-100 text-gray-800",
@@ -306,7 +295,7 @@ export function ApplicationsList({
     return texts[type] || type;
   };
 
-  // ИСПРАВЛЕНИЕ: Обработчики изменения фильтров
+  // Обработчики изменения фильтров
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
@@ -329,18 +318,16 @@ export function ApplicationsList({
   };
 
   const clearFilters = () => {
-    const clearedFilters = { ...initialFilters, searchQuery: "" };
+    const clearedFilters = { ...memoizedInitialFilters, searchQuery: "" };
     setFilters(clearedFilters);
     setSearchQuery("");
   };
 
-  // ИСПРАВЛЕНИЕ: Адаптированные заголовки для разных ролей
+  // Адаптированные заголовки для разных ролей
   const getPageTitle = () => {
     switch (variant) {
       case "participant":
         return "Мои заявки";
-      case "reviewer":
-        return "Заявки на рецензирование";
       case "organizer":
         return "Заявки в моих конференциях";
       case "admin":
@@ -349,6 +336,16 @@ export function ApplicationsList({
     }
   };
 
+  // ДОБАВЛЕНО: Показ состояния загрузки
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mr-3" />
+        <span className="text-gray-600">Загрузка заявок...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -356,15 +353,15 @@ export function ApplicationsList({
           <h2 className="text-xl font-semibold text-gray-900">
             {getPageTitle()}
           </h2>
-          {filteredApplications.length !== getAllApplications().length && (
+          {filteredApplications.length !== applications.length && (
             <p className="text-sm text-gray-600 mt-1">
-              Показано {filteredApplications.length} из{" "}
-              {getAllApplications().length} заявок
+              Показано {filteredApplications.length} из {applications.length}{" "}
+              заявок
             </p>
           )}
         </div>
         <div className="text-sm text-gray-500">
-          Всего заявок: {filteredApplications.length}
+          Всего заявок: {applications.length}
         </div>
       </div>
 
@@ -430,12 +427,9 @@ export function ApplicationsList({
             </div>
 
             <div className="flex items-end">
-              <button
-                onClick={clearFilters}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors flex items-center"
-              >
+              <Button variant="outline" size="sm" onClick={clearFilters}>
                 Очистить
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -492,228 +486,217 @@ export function ApplicationsList({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredApplications.map((application) => (
-                <tr
-                  key={application.$id}
-                  className="hover:bg-gray-50 cursor-pointer"
-                  onClick={() => onApplicationClick(application)}
-                >
-                  {!isParticipantView && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <User className="h-8 w-8 text-gray-400 mr-3" />
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {application.fullName}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {application.organization}
-                          </div>
-                          {application.position && (
-                            <div className="text-xs text-gray-400">
-                              {application.position}
+              {filteredApplications.map((application) => {
+                const actions = getAvailableActions(application);
+                const isProcessing = !!processingApplications[application.$id];
+                const processingAction =
+                  processingApplications[application.$id];
+
+                return (
+                  <tr
+                    key={application.$id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => onApplicationClick(application)}
+                  >
+                    {!isParticipantView && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <User className="h-8 w-8 text-gray-400 mr-3" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {application.fullName}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                  )}
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900">
-                      {isParticipantView ? (
-                        <>
-                          <div className="font-medium">
-                            Конференция #{application.conferenceId}
-                          </div>
-                          <div className="text-gray-500 text-xs">
-                            {application.hasPresentation
-                              ? `${getPresentationTypeText(
-                                  application.presentationType
-                                )}`
-                              : "Участие без доклада"}
-                          </div>
-                        </>
-                      ) : application.hasPresentation ? (
-                        <>
-                          <div
-                            className="font-medium line-clamp-1"
-                            title={application.presentationTitle}
-                          >
-                            {application.presentationTitle}
-                          </div>
-                          <div className="text-gray-500 text-xs">
-                            {getPresentationTypeText(
-                              application.presentationType
+                            <div className="text-sm text-gray-500">
+                              {application.organization}
+                            </div>
+                            {application.position && (
+                              <div className="text-xs text-gray-400">
+                                {application.position}
+                              </div>
                             )}
                           </div>
-                        </>
-                      ) : (
-                        <span className="text-gray-500 italic">
-                          Без презентации
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                        application.status
-                      )}`}
-                    >
-                      {getStatusText(application.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      {new Date(application.createdAt).toLocaleDateString(
-                        "ru-RU"
-                      )}
-                    </div>
-                    {application.reviewDate && (
-                      <div className="flex items-center text-xs text-gray-400 mt-1">
-                        <Clock className="h-3 w-3 mr-1" />
-                        Рецензия:{" "}
-                        {new Date(application.reviewDate).toLocaleDateString(
+                        </div>
+                      </td>
+                    )}
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900">
+                        {isParticipantView ? (
+                          <>
+                            <div className="font-medium">
+                              Конференция #{application.fullName}
+                            </div>
+                            <div className="text-gray-500 text-xs">
+                              {application.hasPresentation
+                                ? `${getPresentationTypeText(
+                                    application.presentationType
+                                  )}`
+                                : "Участие без доклада"}
+                            </div>
+                          </>
+                        ) : application.hasPresentation ? (
+                          <>
+                            <div
+                              className="font-medium line-clamp-1"
+                              title={application.presentationTitle}
+                            >
+                              {application.presentationTitle}
+                            </div>
+                            <div className="text-gray-500 text-xs">
+                              {getPresentationTypeText(
+                                application.presentationType
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-gray-500 italic">
+                            Без презентации
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                          application.status
+                        )}`}
+                      >
+                        {getStatusText(application.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {new Date(application.$createdAt).toLocaleDateString(
                           "ru-RU"
                         )}
                       </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onApplicationClick(application);
-                        }}
-                        className="text-indigo-600 hover:text-indigo-900 transition-colors"
-                        title={
-                          isParticipantView
-                            ? "Просмотреть заявку"
-                            : "Детали заявки"
-                        }
-                      >
-                        {isParticipantView ? "Просмотреть" : "Детали"}
-                      </button>
-
-                      {shouldShowReviewActions && (
-                        <button
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onApplicationReview!(application);
+                            onApplicationClick(application);
                           }}
-                          className="text-green-600 hover:text-green-900 transition-colors"
-                          title="Рецензировать заявку"
+                          icon={Eye}
                         >
-                          Рецензировать
-                        </button>
-                      )}
+                          {isParticipantView ? "Просмотр" : "Детали"}
+                        </Button>
 
-                      {showOrganizerActions && (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log("Принять заявку:", application.$id);
-                            }}
-                            className="text-green-600 hover:text-green-900 transition-colors"
-                            title="Принять заявку"
-                          >
-                            Принять
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log("Отклонить заявку:", application.$id);
-                            }}
-                            className="text-red-600 hover:text-red-900 transition-colors"
-                            title="Отклонить заявку"
-                          >
-                            Отклонить
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {/* ИСПРАВЛЕНИЕ: Кнопки действий только для админов и организаторов */}
+                        {shouldShowReviewActions && (
+                          <>
+                            {actions.canAccept && (
+                              <Button
+                                variant="success"
+                                size="sm"
+                                loading={
+                                  isProcessing &&
+                                  processingAction === "accepting"
+                                }
+                                disabled={isProcessing}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAcceptApplication(application.$id);
+                                }}
+                                icon={Check}
+                              >
+                                Принять
+                              </Button>
+                            )}
+
+                            {actions.canReject && (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                loading={
+                                  isProcessing &&
+                                  processingAction === "rejecting"
+                                }
+                                disabled={isProcessing}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRejectApplication(application.$id);
+                                }}
+                                icon={X}
+                              >
+                                Отклонить
+                              </Button>
+                            )}
+
+                            {actions.canWaitlist && onApplicationWaitlist && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                loading={
+                                  isProcessing &&
+                                  processingAction === "waitlisting"
+                                }
+                                disabled={isProcessing}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleWaitlistApplication(application.$id);
+                                }}
+                                icon={Clock}
+                              >
+                                В очередь
+                              </Button>
+                            )}
+
+                            {onApplicationReview && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onApplicationReview(application);
+                                }}
+                                icon={MessageSquare}
+                              >
+                                Рецензия
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        </div>
-
-        {/* Пагинация (заглушка) */}
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-          <div className="flex-1 flex justify-between sm:hidden">
-            <button className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-              Предыдущая
-            </button>
-            <button className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-              Следующая
-            </button>
-          </div>
-          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-700">
-                Показано <span className="font-medium">1</span> до{" "}
-                <span className="font-medium">
-                  {filteredApplications.length}
-                </span>{" "}
-                из{" "}
-                <span className="font-medium">
-                  {filteredApplications.length}
-                </span>{" "}
-                результатов
-              </p>
-            </div>
-            <div>
-              <nav
-                className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                aria-label="Pagination"
-              >
-                <button className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                  Предыдущая
-                </button>
-                <button className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-indigo-50 text-sm font-medium text-indigo-600">
-                  1
-                </button>
-                <button className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                  Следующая
-                </button>
-              </nav>
-            </div>
-          </div>
         </div>
       </div>
 
       {/* Пустое состояние */}
-      {filteredApplications.length === 0 && (
+      {applications.length === 0 ? (
         <div className="text-center py-12">
           <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {filters.searchQuery || filters.status
-              ? "Заявки не найдены"
-              : isParticipantView
-              ? "У вас пока нет заявок"
-              : "Заявки не найдены"}
+            {isParticipantView ? "У вас пока нет заявок" : "Заявки не найдены"}
           </h3>
           <p className="text-gray-600 mb-4">
-            {filters.searchQuery || filters.status
-              ? "Попробуйте изменить параметры поиска"
-              : isParticipantView
+            {isParticipantView
               ? "Подайте заявку на участие в конференции"
               : "Заявки появятся здесь после их подачи участниками"}
           </p>
-          {(filters.searchQuery || filters.status) && (
-            <button
-              onClick={clearFilters}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-            >
-              Очистить фильтры
-            </button>
-          )}
         </div>
-      )}
+      ) : filteredApplications.length === 0 ? (
+        <div className="text-center py-12">
+          <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Заявки не найдены
+          </h3>
+          <p className="text-gray-600 mb-4">
+            Попробуйте изменить параметры поиска
+          </p>
+          <Button variant="outline" onClick={clearFilters}>
+            Очистить фильтры
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

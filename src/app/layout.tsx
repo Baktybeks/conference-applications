@@ -4,8 +4,8 @@ import { Providers } from "./providers";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "BAMORA",
-  description: "Платформа подачи заявок на ремонт и обслуживание помещений",
+  title: "Заявка",
+  description: "Платформа подачи заявок на конференцию",
 };
 
 export default function RootLayout({

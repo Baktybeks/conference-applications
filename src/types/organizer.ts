@@ -53,15 +53,6 @@ export interface AttentionItem {
   dueDate?: string;
 }
 
-// Типы для рецензирования
-export interface ReviewStats {
-  totalApplications: number;
-  needsReviewers: number;
-  inReview: number;
-  completed: number;
-  overdue: number;
-}
-
 export interface ReviewerAssignment {
   id: string;
   reviewerId: string;

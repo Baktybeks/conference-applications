@@ -1,9 +1,10 @@
-// src/services/applicationService.ts
+// src/services/applicationService.ts - ИСПРАВЛЕННАЯ ВЕРСИЯ
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createApplication,
   updateApplication,
+  updateApplicationStatus, // ДОБАВЛЕНО: импорт реальной функции
   getApplications,
   getUserById,
 } from "@/services/appwriteService";
@@ -32,6 +33,7 @@ export interface CreateApplicationData {
   dietaryRestrictions?: string;
   accessibilityNeeds?: string;
   accommodationNeeded?: boolean;
+  $createdAt: string;
 }
 
 export interface UpdateApplicationData extends Partial<CreateApplicationData> {
@@ -45,25 +47,40 @@ export function useCreateApplication() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: CreateApplicationData) => {
-      const applicationData: Omit<
-        ConferenceApplication,
-        "$id" | "$createdAt" | "$updatedAt"
-      > = {
-        ...data,
-        status: ApplicationStatus.DRAFT,
-        keywords: data.keywords || [],
-        dietaryRestrictions: data.dietaryRestrictions || "",
-        accessibilityNeeds: data.accessibilityNeeds || "",
-        accommodationNeeded: data.accommodationNeeded || false,
-        presentationTitle: data.presentationTitle || "",
-        abstract: data.abstract || "",
-        reviewerComments: "",
-        attended: false,
-        certificateIssued: false,
-        certificateUrl: "",
-        createdAt: new Date().toISOString(),
-      };
+    mutationFn: async ({
+      data,
+      participantId,
+      isDraft,
+    }: {
+      data: CreateApplicationData;
+      participantId: string;
+      isDraft: boolean;
+    }) => {
+      // ИСПРАВЛЕНИЕ: Правильно формируем объект заявки с учетом типизации
+      const applicationData: Omit<ConferenceApplication, "$id" | "$updatedAt"> =
+        {
+          ...data,
+          participantId,
+          status: isDraft
+            ? ApplicationStatus.DRAFT
+            : ApplicationStatus.SUBMITTED,
+          conferenceId: data.conferenceId,
+          fullName: data.fullName,
+          organization: data.organization,
+          position: data.position || "", // ИСПРАВЛЕНИЕ: Устанавливаем пустую строку если undefined
+          email: data.email,
+          phone: data.phone || "", // ИСПРАВЛЕНИЕ: Устанавливаем пустую строку если undefined
+          hasPresentation: data.hasPresentation,
+          presentationType: data.presentationType || undefined,
+          presentationTitle: data.presentationTitle || "",
+          abstract: data.abstract || "",
+          keywords: data.keywords || [],
+          dietaryRestrictions: data.dietaryRestrictions || "",
+          accessibilityNeeds: data.accessibilityNeeds || "",
+          accommodationNeeded: data.accommodationNeeded || false,
+          attended: false,
+          $createdAt: data.$createdAt,
+        };
 
       return await createApplication(applicationData);
     },
@@ -100,18 +117,8 @@ export function useUpdateApplication() {
       applicationId: string;
       data: UpdateApplicationData;
     }) => {
-      // TODO: Реализовать updateApplication в appwriteService
-      // Пока используем заглушку
-      console.log("Обновление заявки:", applicationId, data);
-
-      // Имитация обновления
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      return {
-        $id: applicationId,
-        ...data,
-        $updatedAt: new Date().toISOString(),
-      };
+      // ИСПРАВЛЕНИЕ: Используем реальную функцию updateApplication
+      return await updateApplication(applicationId, data);
     },
     onSuccess: (data, variables) => {
       // Инвалидируем кеш
@@ -156,12 +163,6 @@ export function useApplications(filters?: ApplicationFilters) {
           return false;
         }
         if (
-          filters.assignedReviewerId &&
-          app.assignedReviewerId !== filters.assignedReviewerId
-        ) {
-          return false;
-        }
-        if (
           filters.hasPresentation !== undefined &&
           app.hasPresentation !== filters.hasPresentation
         ) {
@@ -203,32 +204,21 @@ export function useConferenceApplications(conferenceId: string) {
   return useApplications({ conferenceId });
 }
 
-// Хук для получения заявок рецензента
-export function useReviewerApplications(reviewerId: string) {
-  return useApplications({ assignedReviewerId: reviewerId });
-}
-
 // Хук для подачи заявки (изменение статуса с DRAFT на SUBMITTED)
 export function useSubmitApplication() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (applicationId: string) => {
-      // TODO: Реализовать в appwriteService
-      console.log("Подача заявки:", applicationId);
-
-      // Имитация подачи заявки
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      return {
-        $id: applicationId,
-        status: ApplicationStatus.SUBMITTED,
-        $updatedAt: new Date().toISOString(),
-      };
+      // ИСПРАВЛЕНИЕ: Используем реальную функцию updateApplicationStatus
+      return await updateApplicationStatus(
+        applicationId,
+        ApplicationStatus.SUBMITTED
+      );
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["applications"] });
-      queryClient.invalidateQueries({ queryKey: ["application", data.$id] });
+      queryClient.invalidateQueries({ queryKey: ["application", data?.$id] });
 
       toast.success("Заявка успешно подана на рассмотрение!");
     },
@@ -241,7 +231,7 @@ export function useSubmitApplication() {
   });
 }
 
-// Хук для принятия/отклонения заявки (для организаторов)
+// ИСПРАВЛЕНИЕ: Хук для принятия/отклонения заявки (для организаторов)
 export function useReviewApplication() {
   const queryClient = useQueryClient();
 
@@ -255,32 +245,29 @@ export function useReviewApplication() {
       status:
         | ApplicationStatus.ACCEPTED
         | ApplicationStatus.REJECTED
-        | ApplicationStatus.WAITLIST;
+        | ApplicationStatus.WAITLIST
+        | ApplicationStatus.UNDER_REVIEW;
       comments?: string;
     }) => {
-      // TODO: Реализовать в appwriteService
+      // ИСПРАВЛЕНИЕ: Используем реальную функцию updateApplicationStatus вместо заглушки
       console.log("Рецензирование заявки:", applicationId, status, comments);
 
-      // Имитация рецензирования
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      return {
-        $id: applicationId,
-        status,
-        reviewerComments: comments || "",
-        reviewDate: new Date().toISOString(),
-        $updatedAt: new Date().toISOString(),
-      };
+      return await updateApplicationStatus(applicationId, status, comments);
     },
     onSuccess: (data) => {
+      // Инвалидируем все связанные кеши
       queryClient.invalidateQueries({ queryKey: ["applications"] });
-      queryClient.invalidateQueries({ queryKey: ["application", data.$id] });
+      queryClient.invalidateQueries({ queryKey: ["application", data?.$id] });
+      queryClient.invalidateQueries({ queryKey: ["application-stats"] });
 
       const statusText = {
+        [ApplicationStatus.DRAFT]: "сохранена как черновик",
+        [ApplicationStatus.SUBMITTED]: "подана на рассмотрение",
+        [ApplicationStatus.UNDER_REVIEW]: "отправлена на рассмотрение",
         [ApplicationStatus.ACCEPTED]: "принята",
         [ApplicationStatus.REJECTED]: "отклонена",
         [ApplicationStatus.WAITLIST]: "добавлена в список ожидания",
-      }[data.status];
+      }[data?.status as ApplicationStatus];
 
       toast.success(`Заявка ${statusText}!`);
     },
@@ -342,13 +329,6 @@ export function useApplicationStats(filters?: ApplicationFilters) {
         if (filters.conferenceId && app.conferenceId !== filters.conferenceId) {
           return false;
         }
-        if (
-          filters.assignedReviewerId &&
-          app.assignedReviewerId !== filters.assignedReviewerId
-        ) {
-          return false;
-        }
-
         return true;
       });
 

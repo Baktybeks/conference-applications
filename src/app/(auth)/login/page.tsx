@@ -7,7 +7,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthCookieSync } from "@/utils/cookieSync";
-import { AuthDiagnostics } from "@/components/AuthDiagnostics";
 import Layout from "@/components/common/Layout";
 import { toast } from "react-toastify";
 import {
@@ -186,10 +185,6 @@ function LoginForm() {
         targetPath = "/organizer";
         console.log("📋 Редирект для ORGANIZER на /organizer");
         break;
-      case UserRole.REVIEWER:
-        targetPath = "/reviewer";
-        console.log("✍️ Редирект для REVIEWER на /reviewer");
-        break;
       case UserRole.PARTICIPANT:
         targetPath = "/participant";
         console.log("🎓 Редирект для PARTICIPANT на /participant");
@@ -238,17 +233,6 @@ function LoginForm() {
 
         {/* Форма входа */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          {/* DEBUG: Информация о состоянии (удалить в продакшене) */}
-          {process.env.NODE_ENV === "development" && (
-            <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
-              <strong>DEBUG:</strong> User:{" "}
-              {user
-                ? `${user.role} (${user.isActive ? "active" : "inactive"})`
-                : "null"}
-              , Loading: {loading ? "true" : "false"}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Сообщение об ошибке */}
             {(error || errorMessage) && (
@@ -398,13 +382,6 @@ function LoginForm() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
-              <div>
-                <div className="font-medium text-gray-900">Рецензент</div>
-                <div className="text-gray-500">Оценка заявок</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-purple-500 rounded-full flex-shrink-0"></div>
               <div>
                 <div className="font-medium text-gray-900">Участник</div>
@@ -450,7 +427,6 @@ export default function LoginPage() {
       <Suspense fallback={<LoginPageFallback />}>
         <LoginNotifications />
         <LoginForm />
-        <AuthDiagnostics />
       </Suspense>
     </Layout>
   );

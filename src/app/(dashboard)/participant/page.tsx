@@ -2,12 +2,16 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import Layout from "@/components/common/Layout";
 import { ConferencesList } from "@/components/conferences/ConferencesList";
 import { ApplicationsList } from "@/components/applications/ApplicationsList";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
-import { Conference, ConferenceApplication } from "@/types";
+import { CreateApplicationModal } from "@/components/applications/CreateApplicationModal";
+import { useConferences } from "@/services/conferenceService";
+import { useParticipantApplications } from "@/services/applicationService";
+import { Conference, ConferenceApplication, UserRole } from "@/types";
 import {
   Calendar,
   FileText,
@@ -22,204 +26,395 @@ import {
   Mail,
   Phone,
   Building,
+  RefreshCw,
+  Plus,
 } from "lucide-react";
 
 export default function ParticipantPage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "conferences" | "applications" | "certificates" | "profile"
   >("dashboard");
 
-  if (!user) {
+  // Состояние для модального окна подачи заявки
+  const [isApplicationModalOpen, setIsApplicationModalOpen] = useState(false);
+  const [selectedConference, setSelectedConference] =
+    useState<Conference | null>(null);
+
+  // Загружаем реальные данные конференций (только опубликованные для участников)
+  const {
+    data: conferences = [],
+    isLoading: conferencesLoading,
+    error: conferencesError,
+    refetch: refetchConferences,
+  } = useConferences({ isPublished: true });
+
+  // Загружаем заявки участника
+  const {
+    data: userApplications = [],
+    isLoading: applicationsLoading,
+    refetch: refetchApplications,
+  } = useParticipantApplications(user?.$id || "");
+
+  // ВСЕ КОЛБЭКИ ПЕРЕМЕЩЕНЫ В НАЧАЛО, ДО УСЛОВНЫХ ПРОВЕРОК
+  const handleConferenceClick = useCallback(
+    (conference: Conference) => {
+      // Проверяем, есть ли уже заявка на эту конференцию
+      const existingApplication = userApplications.find(
+        (app) => app.conferenceId === conference.$id
+      );
+
+      if (existingApplication) {
+        // Если заявка уже есть, показываем информацию
+        console.log(
+          "У вас уже есть заявку на эту конференцию:",
+          existingApplication
+        );
+        // TODO: Можно показать модальное окно с информацией о существующей заявке
+        setActiveTab("applications");
+      } else {
+        // Открываем модальное окно для подачи заявки
+        setSelectedConference(conference);
+        setIsApplicationModalOpen(true);
+      }
+    },
+    [
+      userApplications,
+      setActiveTab,
+      setSelectedConference,
+      setIsApplicationModalOpen,
+    ]
+  );
+
+  const handleApplicationClick = useCallback(
+    (application: ConferenceApplication) => {
+      // TODO: Открыть модальное окно с деталями заявки
+      console.log("Открыть заявку:", application);
+    },
+    []
+  );
+
+  const handleRefreshData = useCallback(async () => {
+    try {
+      await Promise.all([refetchConferences(), refetchApplications()]);
+    } catch (error) {
+      console.error("Ошибка при обновлении данных:", error);
+    }
+  }, [refetchConferences, refetchApplications]);
+
+  const handleApplicationModalClose = useCallback(() => {
+    setIsApplicationModalOpen(false);
+    setSelectedConference(null);
+    // Обновляем данные после создания заявки
+    refetchApplications();
+  }, [refetchApplications]);
+
+  // УСЛОВНЫЕ ПРОВЕРКИ ПОСЛЕ ВСЕХ ХУКОВ
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      </Layout>
     );
   }
 
-  const handleConferenceClick = (conference: Conference) => {
-    // TODO: Открыть модальное окно с деталями конференции
-    console.log("Открыть конференцию:", conference);
-  };
+  if (!user) {
+    return (
+      <Layout showNavbar={false}>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center bg-white p-8 rounded-lg shadow-lg">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+              Требуется авторизация
+            </h1>
+            <p className="text-gray-600">
+              Пожалуйста, войдите в систему для доступа к личному кабинету.
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
-  const handleApplicationClick = (application: ConferenceApplication) => {
-    // TODO: Открыть модальное окно с деталями заявки
-    console.log("Открыть заявку:", application);
-  };
+  if (
+    user.role !== UserRole.PARTICIPANT &&
+    user.role !== UserRole.SUPER_ADMIN
+  ) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center bg-white p-8 rounded-lg shadow-lg">
+            <User className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-red-600 mb-4">
+              Доступ запрещен
+            </h1>
+            <p className="text-gray-600 mb-4">
+              У вас нет прав для доступа к кабинету участника.
+            </p>
+            <p className="text-sm text-gray-500">Ваша роль: {user.role}</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Заголовок */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Личный кабинет участника
-              </h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Добро пожаловать, {user.name}! Управляйте своими заявками на
-                конференции
-              </p>
-            </div>
-            <div className="flex items-center space-x-3">
-              <button className="relative p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
-              </button>
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                <p className="text-xs text-gray-500">{user.email}</p>
+    <Layout title="Личный кабинет участника">
+      <div className="min-h-screen bg-gray-50">
+        {/* Заголовок - более компактный, так как основная навигация в Navbar */}
+        <div className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-6">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                  <User className="h-6 w-6 mr-3 text-purple-600" />
+                  Личный кабинет участника
+                </h1>
+                <p className="text-sm text-gray-600 mt-1">
+                  Добро пожаловать, {user.name}! Управляйте своими заявками на
+                  конференции
+                </p>
+                {/* Показываем краткую статистику */}
+                <div className="flex items-center space-x-6 mt-3 text-sm text-gray-600">
+                  <span>
+                    Конференций:{" "}
+                    <strong className="text-indigo-600">
+                      {conferences.length}
+                    </strong>
+                  </span>
+                  <span>
+                    Заявок:{" "}
+                    <strong className="text-green-600">
+                      {userApplications.length}
+                    </strong>
+                  </span>
+                  <span>
+                    Принято:{" "}
+                    <strong className="text-blue-600">
+                      {
+                        userApplications.filter(
+                          (app) => app.status === "ACCEPTED"
+                        ).length
+                      }
+                    </strong>
+                  </span>
+                </div>
               </div>
-              <div className="h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <User className="h-6 w-6 text-purple-600" />
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={handleRefreshData}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                  title="Обновить данные"
+                >
+                  <RefreshCw className="h-5 w-5" />
+                </button>
+
+                {/* Быстрая кнопка для подачи заявки */}
+                <button
+                  onClick={() => setActiveTab("conferences")}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Найти конференции
+                </button>
+
+                <button className="relative p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors">
+                  <Bell className="h-5 w-5" />
+                  {userApplications.filter(
+                    (app) => app.status === "UNDER_REVIEW"
+                  ).length > 0 && (
+                    <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
+                  )}
+                </button>
+
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-900">
+                    {user.name}
+                  </p>
+                  <p className="text-xs text-gray-500">{user.email}</p>
+                </div>
+                <div className="h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center">
+                  <User className="h-6 w-6 text-purple-600" />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Навигационные вкладки */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
-            <button
-              onClick={() => setActiveTab("dashboard")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "dashboard"
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <BarChart3 className="inline h-4 w-4 mr-2" />
-              Обзор
-            </button>
-            <button
-              onClick={() => setActiveTab("conferences")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "conferences"
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <Calendar className="inline h-4 w-4 mr-2" />
-              Конференции
-            </button>
-            <button
-              onClick={() => setActiveTab("applications")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "applications"
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <FileText className="inline h-4 w-4 mr-2" />
-              Мои заявки
-            </button>
-            <button
-              onClick={() => setActiveTab("certificates")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "certificates"
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <Award className="inline h-4 w-4 mr-2" />
-              Сертификаты
-            </button>
-            <button
-              onClick={() => setActiveTab("profile")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "profile"
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <Settings className="inline h-4 w-4 mr-2" />
-              Профиль
-            </button>
-          </nav>
-        </div>
-      </div>
-
-      {/* Контент */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === "dashboard" && (
-          <div className="space-y-8">
-            {/* Быстрые действия */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <QuickActionCard
-                title="Найти конференции"
-                description="Просмотрите доступные конференции"
+        {/* Навигационные вкладки */}
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <nav className="flex space-x-8">
+              <TabButton
+                id="dashboard"
+                label="Обзор"
+                icon={BarChart3}
+                isActive={activeTab === "dashboard"}
+                onClick={() => setActiveTab("dashboard")}
+              />
+              <TabButton
+                id="conferences"
+                label="Конференции"
                 icon={Calendar}
-                color="bg-blue-500"
+                isActive={activeTab === "conferences"}
                 onClick={() => setActiveTab("conferences")}
+                badge={conferences.length}
               />
-              <QuickActionCard
-                title="Мои заявки"
-                description="Управляйте поданными заявками"
+              <TabButton
+                id="applications"
+                label="Мои заявки"
                 icon={FileText}
-                color="bg-green-500"
+                isActive={activeTab === "applications"}
                 onClick={() => setActiveTab("applications")}
+                badge={userApplications.length}
               />
-              <QuickActionCard
-                title="Сертификаты"
-                description="Скачайте сертификаты участия"
-                icon={Award}
-                color="bg-purple-500"
-                onClick={() => setActiveTab("certificates")}
+              <TabButton
+                id="profile"
+                label="Профиль"
+                icon={Settings}
+                isActive={activeTab === "profile"}
+                onClick={() => setActiveTab("profile")}
+              />
+            </nav>
+          </div>
+        </div>
+
+        {/* Контент */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {activeTab === "dashboard" && (
+            <div className="space-y-8">
+              {/* Быстрые действия */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <QuickActionCard
+                  title="Найти конференции"
+                  description={`${conferences.length} доступных конференций`}
+                  icon={Calendar}
+                  color="bg-blue-500"
+                  onClick={() => setActiveTab("conferences")}
+                />
+                <QuickActionCard
+                  title="Мои заявки"
+                  description={`${userApplications.length} поданных заявок`}
+                  icon={FileText}
+                  color="bg-green-500"
+                  onClick={() => setActiveTab("applications")}
+                />
+                <QuickActionCard
+                  title="Профиль"
+                  description="Управление настройками"
+                  icon={User}
+                  color="bg-purple-500"
+                  onClick={() => setActiveTab("profile")}
+                />
+              </div>
+
+              {/* Ближайшие дедлайны */}
+              <UpcomingDeadlines
+                userId={user.$id}
+                conferences={conferences}
+                applications={userApplications}
               />
             </div>
+          )}
 
-            {/* Статистика */}
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                Моя активность
-              </h2>
-              <DashboardStats filters={{ participantId: user.$id }} />
+          {activeTab === "conferences" && (
+            <div className="space-y-6">
+              {conferencesError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-800">Ошибка загрузки конференций</p>
+                </div>
+              )}
+
+              <ConferencesList
+                conferences={conferences}
+                onConferenceClick={handleConferenceClick}
+                showFilters={true}
+                variant="participant"
+                showCreateButton={false}
+                showEditButton={false}
+                isLoading={conferencesLoading}
+              />
             </div>
+          )}
 
-            {/* Ближайшие дедлайны */}
-            <UpcomingDeadlines userId={user.$id} />
+          {activeTab === "applications" && (
+            <div className="space-y-6">
+              {applicationsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mr-3"></div>
+                  <span className="text-gray-600">Загрузка заявок...</span>
+                </div>
+              ) : (
+                <ApplicationsList
+                  applications={userApplications}
+                  initialFilters={{ participantId: user.$id }}
+                  onApplicationClick={handleApplicationClick}
+                  showFilters={true}
+                  variant="participant"
+                />
+              )}
+            </div>
+          )}
 
-            {/* Последние обновления */}
-            <RecentUpdates userId={user.$id} />
-          </div>
-        )}
-
-        {activeTab === "conferences" && (
-          <div>
-            <ConferencesList
-              onConferenceClick={handleConferenceClick}
-              showFilters={true}
-            />
-          </div>
-        )}
-
-        {activeTab === "applications" && (
-          <div>
-            <ApplicationsList
-              initialFilters={{ participantId: user.$id }}
-              onApplicationClick={handleApplicationClick}
-              showFilters={true}
-            />
-          </div>
-        )}
-
-        {activeTab === "certificates" && (
-          <div>
-            <CertificatesSection userId={user.$id} />
-          </div>
-        )}
-
-        {activeTab === "profile" && (
-          <div className="max-w-2xl">
-            <ProfileSection user={user} />
-          </div>
-        )}
+          {activeTab === "profile" && (
+            <div className="max-w-2xl">
+              <ProfileSection user={user} />
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Модальное окно подачи заявки */}
+      {isApplicationModalOpen && selectedConference && (
+        <CreateApplicationModal
+          isOpen={isApplicationModalOpen}
+          onClose={handleApplicationModalClose}
+          conference={selectedConference}
+          participantId={user.$id}
+          userEmail={user.email}
+          userName={user.name}
+          userOrganization={user.organization}
+        />
+      )}
+    </Layout>
+  );
+}
+
+// Компонент кнопки вкладки
+interface TabButtonProps {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  isActive: boolean;
+  onClick: () => void;
+  badge?: number;
+}
+
+function TabButton({
+  label,
+  icon: Icon,
+  isActive,
+  onClick,
+  badge,
+}: TabButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors flex items-center ${
+        isActive
+          ? "border-indigo-500 text-indigo-600"
+          : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+      }`}
+    >
+      <Icon className="h-4 w-4 mr-2" />
+      {label}
+      {badge !== undefined && badge > 0 && (
+        <span className="ml-2 bg-indigo-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -242,7 +437,7 @@ function QuickActionCard({
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer"
+      className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer border border-gray-200"
     >
       <div className="flex items-center mb-4">
         <div className={`${color} rounded-lg p-3`}>
@@ -255,25 +450,45 @@ function QuickActionCard({
   );
 }
 
-// Компонент ближайших дедлайнов
-function UpcomingDeadlines({ userId }: { userId: string }) {
-  // TODO: Получить данные о ближайших дедлайнах
-  const deadlines = [
-    {
-      id: "1",
-      conference: "Международная конференция по ИИ",
-      deadline: "2024-02-15",
-      type: "submission",
-      daysLeft: 5,
-    },
-    {
-      id: "2",
-      conference: "Конференция по машинному обучению",
-      deadline: "2024-02-20",
-      type: "registration",
-      daysLeft: 10,
-    },
-  ];
+// Компонент ближайших дедлайнов с реальными данными
+interface UpcomingDeadlinesProps {
+  userId: string;
+  conferences: Conference[];
+  applications: ConferenceApplication[];
+}
+
+function UpcomingDeadlines({
+  userId,
+  conferences,
+  applications,
+}: UpcomingDeadlinesProps) {
+  const now = new Date();
+
+  // Получаем дедлайны для конференций, на которые участник может подать заявку
+  const upcomingDeadlines = conferences
+    .filter((conf) => {
+      const deadline = new Date(conf.submissionDeadline);
+      const hasApplication = applications.some(
+        (app) => app.conferenceId === conf.$id
+      );
+      return deadline > now && !hasApplication; // Показываем только если нет заявки
+    })
+    .map((conf) => {
+      const deadline = new Date(conf.submissionDeadline);
+      const daysLeft = Math.ceil(
+        (deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      return {
+        id: conf.$id,
+        conference: conf.title,
+        deadline: conf.submissionDeadline,
+        type: "submission" as const,
+        daysLeft,
+      };
+    })
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, 5); // Показываем только первые 5
 
   return (
     <div>
@@ -281,27 +496,26 @@ function UpcomingDeadlines({ userId }: { userId: string }) {
         Ближайшие дедлайны
       </h2>
       <div className="bg-white rounded-lg shadow-md p-6">
-        {deadlines.length === 0 ? (
+        {upcomingDeadlines.length === 0 ? (
           <div className="text-center py-8">
             <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">Нет ближайших дедлайнов</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Все заявки поданы или дедлайны истекли
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {deadlines.map((deadline) => (
+            {upcomingDeadlines.map((deadline) => (
               <div
                 key={deadline.id}
-                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <div>
                   <h4 className="font-medium text-gray-900">
                     {deadline.conference}
                   </h4>
-                  <p className="text-sm text-gray-600">
-                    {deadline.type === "submission"
-                      ? "Дедлайн подачи заявок"
-                      : "Дедлайн регистрации"}
-                  </p>
+                  <p className="text-sm text-gray-600">Дедлайн подачи заявок</p>
                   <p className="text-sm text-gray-500">
                     {new Date(deadline.deadline).toLocaleDateString("ru-RU")}
                   </p>
@@ -328,199 +542,6 @@ function UpcomingDeadlines({ userId }: { userId: string }) {
   );
 }
 
-// Компонент последних обновлений
-function RecentUpdates({ userId }: { userId: string }) {
-  // TODO: Получить данные о последних обновлениях заявок
-  const updates = [
-    {
-      id: "1",
-      conference: "Конференция по блокчейну",
-      status: "accepted",
-      date: "2024-01-25",
-      message: "Ваша заявка принята! Ожидайте дальнейших инструкций.",
-    },
-    {
-      id: "2",
-      conference: "Симпозиум по кибербезопасности",
-      status: "under_review",
-      date: "2024-01-23",
-      message: "Заявка направлена на рассмотрение рецензентам.",
-    },
-    {
-      id: "3",
-      conference: "Конференция по Data Science",
-      status: "rejected",
-      date: "2024-01-20",
-      message: "К сожалению, ваша заявка не была принята в этом году.",
-    },
-  ];
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "accepted":
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
-      case "rejected":
-        return <AlertTriangle className="h-5 w-5 text-red-500" />;
-      case "under_review":
-        return <Clock className="h-5 w-5 text-yellow-500" />;
-      default:
-        return <FileText className="h-5 w-5 text-gray-500" />;
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "accepted":
-        return "Принята";
-      case "rejected":
-        return "Отклонена";
-      case "under_review":
-        return "На рассмотрении";
-      default:
-        return "Обновление";
-    }
-  };
-
-  return (
-    <div>
-      <h2 className="text-xl font-semibold text-gray-900 mb-4">
-        Последние обновления
-      </h2>
-      <div className="bg-white rounded-lg shadow-md p-6">
-        {updates.length === 0 ? (
-          <div className="text-center py-8">
-            <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">Нет новых обновлений</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {updates.map((update) => (
-              <div
-                key={update.id}
-                className="flex items-start p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex-shrink-0 mr-4 mt-1">
-                  {getStatusIcon(update.status)}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <h4 className="font-medium text-gray-900">
-                      {update.conference}
-                    </h4>
-                    <span className="text-xs text-gray-500">
-                      {new Date(update.date).toLocaleDateString("ru-RU")}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-1">
-                    Статус: {getStatusText(update.status)}
-                  </p>
-                  <p className="text-sm text-gray-500">{update.message}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Компонент раздела сертификатов
-function CertificatesSection({ userId }: { userId: string }) {
-  // TODO: Получить данные о сертификатах пользователя
-  const certificates = [
-    {
-      id: "1",
-      conference: "Международная конференция по ИИ 2023",
-      issueDate: "2023-12-15",
-      type: "participation",
-      downloadUrl: "/certificates/ai-conf-2023.pdf",
-    },
-    {
-      id: "2",
-      conference: "Симпозиум по машинному обучению",
-      issueDate: "2023-11-20",
-      type: "presentation",
-      downloadUrl: "/certificates/ml-symposium-2023.pdf",
-    },
-  ];
-
-  const getCertificateTypeLabel = (type: string) => {
-    switch (type) {
-      case "participation":
-        return "Участие";
-      case "presentation":
-        return "Доклад";
-      case "poster":
-        return "Постер";
-      default:
-        return "Сертификат";
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
-          Мои сертификаты
-        </h2>
-        <p className="text-sm text-gray-600 mb-6">
-          Здесь вы можете скачать сертификаты за участие в конференциях
-        </p>
-      </div>
-
-      {certificates.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
-          <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Пока нет сертификатов
-          </h3>
-          <p className="text-gray-600">
-            Сертификаты появятся здесь после участия в конференциях
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {certificates.map((certificate) => (
-            <div
-              key={certificate.id}
-              className="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900 mb-2">
-                    {certificate.conference}
-                  </h3>
-                  <div className="space-y-1 text-sm text-gray-600">
-                    <p>Тип: {getCertificateTypeLabel(certificate.type)}</p>
-                    <p>
-                      Выдан:{" "}
-                      {new Date(certificate.issueDate).toLocaleDateString(
-                        "ru-RU"
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <Award className="h-8 w-8 text-indigo-500" />
-              </div>
-              <button
-                onClick={() => {
-                  // TODO: Реализовать скачивание сертификата
-                  window.open(certificate.downloadUrl, "_blank");
-                }}
-                className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-              >
-                Скачать сертификат
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Компонент профиля пользователя
 function ProfileSection({ user }: { user: any }) {
   return (
     <div className="bg-white shadow rounded-lg">
@@ -671,41 +692,6 @@ function ProfileSection({ user }: { user: any }) {
           </div>
         </div>
 
-        {/* Настройки уведомлений */}
-        <div className="border-t border-gray-200 pt-6">
-          <h4 className="text-sm font-medium text-gray-900 mb-4">
-            Настройки уведомлений
-          </h4>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Email уведомления
-                </p>
-                <p className="text-sm text-gray-500">
-                  Получать уведомления о статусе заявок
-                </p>
-              </div>
-              <button className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-indigo-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                <span className="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-              </button>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Напоминания о дедлайнах
-                </p>
-                <p className="text-sm text-gray-500">
-                  Уведомления за 3 дня до дедлайна
-                </p>
-              </div>
-              <button className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-indigo-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                <span className="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-              </button>
-            </div>
-          </div>
-        </div>
-
         {/* Инструкции */}
         <div className="border-t border-gray-200 pt-6">
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
@@ -724,13 +710,6 @@ function ProfileSection({ user }: { user: any }) {
               </li>
             </ul>
           </div>
-        </div>
-
-        {/* Кнопка редактирования профиля */}
-        <div className="border-t border-gray-200 pt-6">
-          <button className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
-            Редактировать профиль
-          </button>
         </div>
       </div>
     </div>

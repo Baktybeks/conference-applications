@@ -4,7 +4,6 @@
 export enum UserRole {
   SUPER_ADMIN = "SUPER_ADMIN",
   ORGANIZER = "ORGANIZER",
-  REVIEWER = "REVIEWER",
   PARTICIPANT = "PARTICIPANT",
 }
 
@@ -154,15 +153,8 @@ export interface Application extends BaseDocument {
   accessibilityNeeds: string;
   accommodationNeeded: boolean;
 
-  // Рецензирование
-  assignedReviewerId?: string;
-  reviewerComments: string;
-  reviewDate?: string;
-
   // Сертификаты и участие
   attended: boolean;
-  certificateIssued: boolean;
-  certificateUrl: string;
 }
 
 // ДОБАВЛЕНО: DTO для создания заявки
@@ -187,10 +179,7 @@ export interface CreateApplicationDto {
 export interface UpdateApplicationDto extends Partial<CreateApplicationDto> {
   status?: ApplicationStatus;
   assignedReviewerId?: string;
-  reviewerComments?: string;
   attended?: boolean;
-  certificateIssued?: boolean;
-  certificateUrl?: string;
 }
 
 // ДОБАВЛЕНО: Алиас для обратной совместимости
@@ -300,10 +289,6 @@ export interface UserWithDetails extends User {
   // Статистика для организаторов
   organizedConferencesCount?: number;
   managedApplicationsCount?: number;
-
-  // Статистика для рецензентов
-  reviewedApplicationsCount?: number;
-  averageReviewTime?: number;
 
   // Вычисляемые поля
   lastActivityDate?: string;

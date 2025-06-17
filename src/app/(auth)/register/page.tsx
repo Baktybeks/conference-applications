@@ -585,9 +585,6 @@ export default function RegisterPage() {
                     <option value={UserRole.ORGANIZER}>
                       Организатор (создание и управление конференциями)
                     </option>
-                    <option value={UserRole.REVIEWER}>
-                      Рецензент (оценка заявок участников)
-                    </option>
                   </select>
                   <div className="mt-2">
                     <RoleDescription role={formData.role} />
@@ -793,10 +790,6 @@ export default function RegisterPage() {
               модерируют заявки участников
             </p>
             <p>
-              • <strong>Рецензенты</strong> оценивают научные заявки и
-              предоставляют экспертные отзывы
-            </p>
-            <p>
               • <strong>Администраторы</strong> управляют всей системой и
               активируют новых пользователей
             </p>
@@ -819,11 +812,6 @@ function RoleDescription({ role }: { role: UserRole }) {
       text: "Создаёт и управляет конференциями, модерирует заявки участников, формирует программу мероприятий",
       icon: Calendar,
       color: "text-blue-600",
-    },
-    [UserRole.REVIEWER]: {
-      text: "Рецензирует научные заявки участников, предоставляет экспертные отзывы и рекомендации",
-      icon: UserCheck,
-      color: "text-green-600",
     },
     [UserRole.SUPER_ADMIN]: {
       text: "Полный доступ ко всем функциям системы, управление пользователями и конференциями",
@@ -848,7 +836,6 @@ function getRoleDisplayName(role: UserRole): string {
   const names = {
     [UserRole.PARTICIPANT]: "Участник",
     [UserRole.ORGANIZER]: "Организатор",
-    [UserRole.REVIEWER]: "Рецензент",
     [UserRole.SUPER_ADMIN]: "Супер администратор",
   };
   return names[role];

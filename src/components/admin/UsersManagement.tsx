@@ -76,7 +76,6 @@ export function UsersManagement() {
     { value: "", label: "Все роли" },
     { value: UserRole.SUPER_ADMIN, label: "Супер администратор" },
     { value: UserRole.ORGANIZER, label: "Организатор" },
-    { value: UserRole.REVIEWER, label: "Рецензент" },
     { value: UserRole.PARTICIPANT, label: "Участник" },
   ];
 
@@ -180,7 +179,12 @@ export function UsersManagement() {
         <div className="text-red-600 mb-4">
           Ошибка загрузки пользователей: {error.message}
         </div>
-        <Button onClick={() => refetch()} icon={RefreshCw}>
+        <Button
+          onClick={() => {
+            void refetch();
+          }}
+          icon={RefreshCw}
+        >
           Повторить
         </Button>
       </div>
@@ -263,37 +267,6 @@ export function UsersManagement() {
             Сбросить
           </Button>
         </div>
-
-        {/* Массовые действия */}
-        {selectedUsers.length > 0 && (
-          <div className="mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-indigo-900">
-                Выбрано {selectedUsers.length} пользователей
-              </span>
-              <div className="flex space-x-2">
-                <Button
-                  size="sm"
-                  variant="success"
-                  onClick={() => handleBulkAction("activate")}
-                  loading={userManagement.isBulkActivating}
-                  icon={UserCheck}
-                >
-                  Активировать
-                </Button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => handleBulkAction("deactivate")}
-                  loading={userManagement.isBulkDeactivating}
-                  icon={UserX}
-                >
-                  Заблокировать
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Таблица пользователей */}
@@ -301,16 +274,6 @@ export function UsersManagement() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">
-                <input
-                  type="checkbox"
-                  checked={
-                    users.length > 0 && selectedUsers.length === users.length
-                  }
-                  onChange={handleSelectAll}
-                  className="rounded border-gray-300"
-                />
-              </TableHead>
               <TableHead sortable>Пользователь</TableHead>
               <TableHead sortable>Роль</TableHead>
               <TableHead sortable>Статус</TableHead>
@@ -344,14 +307,6 @@ export function UsersManagement() {
             ) : (
               users.map((user) => (
                 <TableRow key={user.$id}>
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      checked={selectedUsers.includes(user.$id)}
-                      onChange={() => handleSelectUser(user.$id)}
-                      className="rounded border-gray-300"
-                    />
-                  </TableCell>
                   <TableCell>
                     <div
                       className="flex items-center cursor-pointer hover:text-indigo-600"

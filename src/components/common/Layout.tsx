@@ -4,7 +4,6 @@
 
 import React from "react";
 import { Navbar } from "@/components/common/Navbar";
-import { AuthDiagnostics } from "@/components/AuthDiagnostics";
 import Head from "next/head";
 
 interface LayoutProps {
@@ -34,7 +33,6 @@ export default function Layout({
       <div className={`min-h-screen bg-gray-50 ${className}`}>
         {showNavbar && <Navbar />}
         <main className={showNavbar ? "" : "pt-0"}>{children}</main>
-        <AuthDiagnostics />
       </div>
     </>
   );

@@ -15,6 +15,7 @@ import {
   Conference,
   PresentationType,
   getPresentationTypeLabel,
+  ApplicationStatus,
 } from "@/types";
 import { toast } from "react-toastify";
 import {
@@ -205,13 +206,14 @@ export function ApplicationForm({
         // Обновление существующей заявки
         const updateData: UpdateApplicationDto = {
           ...formData,
-          status: saveAsDraft ? "DRAFT" : "SUBMITTED",
+          status: saveAsDraft
+            ? ApplicationStatus.DRAFT
+            : ApplicationStatus.SUBMITTED,
         };
 
         await updateApplicationMutation.mutateAsync({
-          id: existingApplication.$id,
+          applicationId: existingApplication.$id,
           data: updateData,
-          userId: user.$id,
         });
 
         toast.success(
@@ -224,7 +226,6 @@ export function ApplicationForm({
           }
         );
       } else {
-        // Создание новой заявки
         await createApplicationMutation.mutateAsync({
           data: formData,
           participantId: user.$id,

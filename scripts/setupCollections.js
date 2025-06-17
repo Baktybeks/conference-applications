@@ -118,14 +118,8 @@ const COLLECTION_SCHEMAS = {
     dietaryRestrictions: { type: "string", required: false, size: 1000 },
     accessibilityNeeds: { type: "string", required: false, size: 1000 },
     accommodationNeeded: { type: "boolean", required: false, default: false },
-    // Рецензирование
-    assignedReviewerId: { type: "string", required: false, size: 36 },
-    reviewerComments: { type: "string", required: false, size: 2000 },
-    reviewDate: { type: "datetime", required: false },
     // Сертификаты и участие
     attended: { type: "boolean", required: false, default: false },
-    certificateIssued: { type: "boolean", required: false, default: false },
-    certificateUrl: { type: "url", required: false, size: 500 },
     createdAt: { type: "datetime", required: true },
   },
 
@@ -182,9 +176,7 @@ const COLLECTION_INDEXES = {
     { key: "hasPresentation", type: "key" },
     { key: "presentationType", type: "key" },
     { key: "createdAt", type: "key" },
-    { key: "reviewDate", type: "key" },
     { key: "attended", type: "key" },
-    { key: "certificateIssued", type: "key" },
   ],
 
   applicationComments: [

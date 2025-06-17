@@ -4,7 +4,20 @@
 
 import React, { useState } from "react";
 import { ConferenceApplication, ApplicationStatus } from "@/types";
-import { X, FileText, User, Mail, Phone, Building } from "lucide-react";
+import { useReviewApplication } from "@/services/applicationService"; // ДОБАВЛЕНО: импорт хука
+import { Button } from "@/components/ui/Button";
+import {
+  X,
+  FileText,
+  User,
+  Mail,
+  Phone,
+  Building,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertCircle,
+} from "lucide-react";
 
 interface ApplicationReviewModalProps {
   application: ConferenceApplication;
@@ -19,70 +32,198 @@ export function ApplicationReviewModal({
   onClose,
   onUpdate,
 }: ApplicationReviewModalProps) {
-  const [reviewComments, setReviewComments] = useState(
-    application.reviewerComments || ""
-  );
   const [newStatus, setNewStatus] = useState<ApplicationStatus>(
     application.status
   );
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [comments, setComments] = useState<string>(""); // ДОБАВЛЕНО: состояние для комментариев
+
+  // ДОБАВЛЕНО: Используем хук для рецензирования заявок
+  const reviewApplicationMutation = useReviewApplication();
 
   if (!isOpen) return null;
 
+  // ИСПРАВЛЕНИЕ: Обновленная функция для отправки рецензии
   const handleSubmitReview = async () => {
-    setIsSubmitting(true);
     try {
-      // TODO: Отправить данные рецензирования на сервер
-      console.log("Отправка рецензии:", {
+      // Проверяем, изменился ли статус
+      if (newStatus === application.status && !comments.trim()) {
+        onClose();
+        return;
+      }
+
+      // Отправляем запрос на обновление статуса
+      await reviewApplicationMutation.mutateAsync({
         applicationId: application.$id,
-        status: newStatus,
-        comments: reviewComments,
+        status: newStatus as
+          | ApplicationStatus.ACCEPTED
+          | ApplicationStatus.REJECTED
+          | ApplicationStatus.WAITLIST
+          | ApplicationStatus.UNDER_REVIEW,
+        comments: comments.trim() || undefined,
       });
 
+      // Вызываем колбэки для обновления UI
       onUpdate();
       onClose();
     } catch (error) {
       console.error("Ошибка при отправке рецензии:", error);
-    } finally {
-      setIsSubmitting(false);
+      // Ошибка уже обработана в хуке через toast
     }
   };
 
-  // ИСПРАВЛЕНИЕ: Добавлена правильная типизация для опций статуса
   const getStatusOptions = (): Array<{
     value: ApplicationStatus;
     label: string;
+    color: string;
+    icon: React.ComponentType<{ className?: string }>;
   }> => [
-    { value: ApplicationStatus.SUBMITTED, label: "Подана" },
-    { value: ApplicationStatus.UNDER_REVIEW, label: "На рассмотрении" },
-    { value: ApplicationStatus.ACCEPTED, label: "Принята" },
-    { value: ApplicationStatus.REJECTED, label: "Отклонена" },
-    { value: ApplicationStatus.WAITLIST, label: "Список ожидания" },
+    {
+      value: ApplicationStatus.SUBMITTED,
+      label: "Подана",
+      color: "text-blue-600",
+      icon: FileText,
+    },
+    {
+      value: ApplicationStatus.UNDER_REVIEW,
+      label: "На рассмотрении",
+      color: "text-yellow-600",
+      icon: Clock,
+    },
+    {
+      value: ApplicationStatus.ACCEPTED,
+      label: "Принята",
+      color: "text-green-600",
+      icon: CheckCircle,
+    },
+    {
+      value: ApplicationStatus.REJECTED,
+      label: "Отклонена",
+      color: "text-red-600",
+      icon: XCircle,
+    },
+    {
+      value: ApplicationStatus.WAITLIST,
+      label: "Список ожидания",
+      color: "text-orange-600",
+      icon: AlertCircle,
+    },
   ];
 
-  // ИСПРАВЛЕНИЕ: Добавлен обработчик с правильной типизацией
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setNewStatus(e.target.value as ApplicationStatus);
   };
+
+  // ДОБАВЛЕНО: Обработчик изменения комментариев
+  const handleCommentsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setComments(e.target.value);
+  };
+
+  const currentStatusOption = getStatusOptions().find(
+    (opt) => opt.value === application.status
+  );
+  const newStatusOption = getStatusOptions().find(
+    (opt) => opt.value === newStatus
+  );
+
+  // ДОБАВЛЕНО: Проверка, есть ли изменения
+  const hasChanges = newStatus !== application.status || comments.trim() !== "";
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Заголовок */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-            <FileText className="h-5 w-5 mr-2 text-indigo-600" />
-            Рецензирование заявки
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
+          <div className="flex items-center">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-indigo-600" />
+              Рецензирование заявки
+            </h2>
+            {currentStatusOption && (
+              <div
+                className={`ml-4 flex items-center ${currentStatusOption.color}`}
+              >
+                <currentStatusOption.icon className="h-4 w-4 mr-1" />
+                <span className="text-sm font-medium">
+                  {currentStatusOption.label}
+                </span>
+              </div>
+            )}
+          </div>
+          <Button variant="ghost" size="sm" icon={X} onClick={onClose}>
+            {""}
+          </Button>
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Изменение статуса */}
+          <div className="bg-indigo-50 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Статус заявки
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Текущий статус
+                </label>
+                {currentStatusOption && (
+                  <div
+                    className={`flex items-center ${currentStatusOption.color}`}
+                  >
+                    <currentStatusOption.icon className="h-5 w-5 mr-2" />
+                    <span className="font-medium">
+                      {currentStatusOption.label}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Новый статус
+                </label>
+                <select
+                  value={newStatus}
+                  onChange={handleStatusChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  disabled={reviewApplicationMutation.isPending} // ДОБАВЛЕНО: отключение при отправке
+                >
+                  {getStatusOptions().map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {newStatusOption && newStatus !== application.status && (
+                  <div
+                    className={`mt-2 flex items-center ${newStatusOption.color}`}
+                  >
+                    <newStatusOption.icon className="h-4 w-4 mr-1" />
+                    <span className="text-sm">
+                      Будет изменен на: {newStatusOption.label}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ДОБАВЛЕНО: Поле для комментариев */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Комментарии рецензента
+              </label>
+              <textarea
+                value={comments}
+                onChange={handleCommentsChange}
+                placeholder="Добавьте комментарии по поводу изменения статуса заявки..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-vertical"
+                rows={4}
+                disabled={reviewApplicationMutation.isPending}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Комментарии будут видны участнику и организаторам
+              </p>
+            </div>
+          </div>
+
           {/* Информация об участнике */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
@@ -94,7 +235,9 @@ export function ApplicationReviewModal({
                 <label className="text-sm font-medium text-gray-600">
                   Полное имя
                 </label>
-                <p className="text-gray-900">{application.fullName}</p>
+                <p className="text-gray-900 font-medium">
+                  {application.fullName}
+                </p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">
@@ -230,61 +373,27 @@ export function ApplicationReviewModal({
               </div>
             </div>
           )}
-
-          {/* Форма рецензирования */}
-          <div className="bg-white border-2 border-indigo-100 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Рецензирование
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Статус заявки
-                </label>
-                {/* ИСПРАВЛЕНИЕ: Использован новый обработчик с правильной типизацией */}
-                <select
-                  value={newStatus}
-                  onChange={handleStatusChange}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  {getStatusOptions().map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Комментарии рецензента
-                </label>
-                <textarea
-                  value={reviewComments}
-                  onChange={(e) => setReviewComments(e.target.value)}
-                  rows={6}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Введите ваши комментарии и рекомендации..."
-                />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Кнопки действий */}
         <div className="flex justify-end space-x-4 p-6 border-t border-gray-200">
-          <button
+          <Button
+            variant="outline"
             onClick={onClose}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            disabled={reviewApplicationMutation.isPending} // ДОБАВЛЕНО: отключение при отправке
           >
             Отмена
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
+            loading={reviewApplicationMutation.isPending} // ИСПРАВЛЕНИЕ: используем состояние из мутации
             onClick={handleSubmitReview}
-            disabled={isSubmitting}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+            disabled={!hasChanges} // ДОБАВЛЕНО: отключение, если нет изменений
           >
-            {isSubmitting ? "Сохранение..." : "Сохранить рецензию"}
-          </button>
+            {reviewApplicationMutation.isPending
+              ? "Сохранение..."
+              : "Сохранить изменения"}
+          </Button>
         </div>
       </div>
     </div>

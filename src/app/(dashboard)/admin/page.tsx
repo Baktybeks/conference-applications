@@ -1,23 +1,33 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import Layout from "@/components/common/Layout";
 import { QuickSystemStats } from "@/components/admin/QuickSystemStats";
-import { SystemActivity } from "@/components/admin/SystemActivity";
-import { AdminAttentionRequired } from "@/components/admin/AdminAttentionRequired";
 import { QuickActions } from "@/components/admin/QuickActions";
 import { UsersManagement } from "@/components/admin/UsersManagement";
 import { ConferencesList } from "@/components/conferences/ConferencesList";
 import { ApplicationsList } from "@/components/applications/ApplicationsList";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { ApplicationReviewModal } from "@/components/applications/ApplicationReviewModal";
-import { SystemAnalytics } from "@/components/analytics/SystemAnalytics";
+import { Button } from "@/components/ui/Button";
+import {
+  useConferences,
+  useDashboardStats,
+  usePublishConference,
+  useUnpublishConference,
+} from "@/services/conferenceService";
+import {
+  useApplications,
+  useReviewApplication,
+} from "@/services/applicationService";
 import {
   Conference,
   ConferenceApplication,
   ApplicationWithDetails,
   UserRole,
+  ConferenceFilters,
+  ApplicationStatus,
 } from "@/types";
 import {
   BarChart3,
@@ -26,10 +36,14 @@ import {
   Users,
   Shield,
   TrendingUp,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 
 export default function AdminPage() {
+  // ✅ ВСЕ ХУКИ В НАЧАЛЕ КОМПОНЕНТА
   const { user, loading } = useAuth();
+
   const [activeTab, setActiveTab] = useState<
     | "dashboard"
     | "conferences"
@@ -42,9 +56,182 @@ export default function AdminPage() {
   const [selectedApplication, setSelectedApplication] = useState<
     ApplicationWithDetails | ConferenceApplication | null
   >(null);
+
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
-  // Показываем загрузку
+  const [conferenceFilters, setConferenceFilters] = useState<ConferenceFilters>(
+    {}
+  );
+
+  // Хуки данных
+  const {
+    data: conferences = [],
+    isLoading: conferencesLoading,
+    error: conferencesError,
+    refetch: refetchConferences,
+  } = useConferences(conferenceFilters);
+
+  const {
+    data: dashboardStats,
+    isLoading: statsLoading,
+    error: statsError,
+  } = useDashboardStats();
+
+  const {
+    data: applications = [],
+    isLoading: applicationsLoading,
+    error: applicationsError,
+    refetch: refetchApplications,
+  } = useApplications();
+
+  // Хуки мутаций
+  const publishConferenceMutation = usePublishConference();
+  const unpublishConferenceMutation = useUnpublishConference();
+  const reviewApplicationMutation = useReviewApplication();
+
+  // Все useCallback хуки
+  const handleConferenceClick = useCallback((conference: Conference) => {
+    console.log("Открыть конференцию:", conference);
+  }, []);
+
+  const handleConferenceEdit = useCallback((conference: Conference) => {
+    console.log("Редактировать конференцию:", conference);
+  }, []);
+
+  const handleApplicationClick = useCallback(
+    (application: ConferenceApplication) => {
+      setSelectedApplication(application);
+      setIsReviewModalOpen(true);
+    },
+    []
+  );
+
+  const handleApplicationReview = useCallback(
+    (application: ConferenceApplication) => {
+      setSelectedApplication(application);
+      setIsReviewModalOpen(true);
+    },
+    []
+  );
+
+  const handleReviewModalClose = useCallback(() => {
+    setIsReviewModalOpen(false);
+    setSelectedApplication(null);
+  }, []);
+
+  const handleApplicationUpdate = useCallback(() => {
+    console.log("Заявка обновлена");
+  }, []);
+
+  const handleRefreshConferences = useCallback(async () => {
+    try {
+      await refetchConferences();
+    } catch (error) {
+      console.error("Ошибка при обновлении конференций:", error);
+    }
+  }, [refetchConferences]);
+
+  const handleRefreshData = useCallback(async () => {
+    try {
+      await Promise.all([refetchConferences(), refetchApplications()]);
+    } catch (error) {
+      console.error("Ошибка при обновлении данных:", error);
+    }
+  }, [refetchConferences, refetchApplications]);
+
+  const handlePublishConference = useCallback(
+    async (conference: Conference) => {
+      try {
+        console.log("🚀 Публикация конференции:", {
+          id: conference.$id,
+          title: conference.title,
+          currentStatus: conference.isPublished ? "опубликована" : "черновик",
+          action: conference.isPublished
+            ? "снять с публикации"
+            : "опубликовать",
+        });
+
+        if (conference.isPublished) {
+          await unpublishConferenceMutation.mutateAsync(conference.$id);
+          console.log("✅ Конференция снята с публикации:", conference.title);
+        } else {
+          await publishConferenceMutation.mutateAsync(conference.$id);
+          console.log("✅ Конференция опубликована:", conference.title);
+        }
+      } catch (error) {
+        console.error("❌ Ошибка при изменении статуса публикации:", error);
+      }
+    },
+    [publishConferenceMutation, unpublishConferenceMutation]
+  );
+
+  const handleAcceptApplication = useCallback(
+    async (applicationId: string, comments?: string) => {
+      try {
+        await reviewApplicationMutation.mutateAsync({
+          applicationId,
+          status: ApplicationStatus.ACCEPTED as const,
+          comments: comments || "Заявка принята администратором",
+        });
+        console.log("✅ Заявка принята:", applicationId);
+      } catch (error) {
+        console.error("❌ Ошибка при принятии заявки:", error);
+        throw error;
+      }
+    },
+    [reviewApplicationMutation]
+  );
+
+  const handleRejectApplication = useCallback(
+    async (applicationId: string, comments?: string) => {
+      try {
+        await reviewApplicationMutation.mutateAsync({
+          applicationId,
+          status: ApplicationStatus.REJECTED as const,
+          comments: comments || "Заявка отклонена администратором",
+        });
+        console.log("✅ Заявка отклонена:", applicationId);
+      } catch (error) {
+        console.error("❌ Ошибка при отклонении заявки:", error);
+        throw error;
+      }
+    },
+    [reviewApplicationMutation]
+  );
+
+  const handleWaitlistApplication = useCallback(
+    async (applicationId: string, comments?: string) => {
+      try {
+        await reviewApplicationMutation.mutateAsync({
+          applicationId,
+          status: ApplicationStatus.WAITLIST as const,
+          comments: comments || "Заявка добавлена в список ожидания",
+        });
+        console.log("✅ Заявка добавлена в список ожидания:", applicationId);
+      } catch (error) {
+        console.error("❌ Ошибка при добавлении в список ожидания:", error);
+        throw error;
+      }
+    },
+    [reviewApplicationMutation]
+  );
+
+  const renderError = useCallback(
+    (error: any, title: string) => (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="flex items-center">
+          <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+          <h3 className="text-sm font-medium text-red-800">{title}</h3>
+        </div>
+        <p className="text-sm text-red-700 mt-1">
+          {error?.message || "Произошла ошибка при загрузке данных"}
+        </p>
+      </div>
+    ),
+    []
+  );
+
+  // ✅ УСЛОВНЫЕ ПРОВЕРКИ ПОСЛЕ ВСЕХ ХУКОВ
   if (loading) {
     return (
       <Layout>
@@ -55,7 +242,6 @@ export default function AdminPage() {
     );
   }
 
-  // Проверяем авторизацию
   if (!user) {
     return (
       <Layout showNavbar={false}>
@@ -73,7 +259,6 @@ export default function AdminPage() {
     );
   }
 
-  // Проверяем права доступа
   if (user.role !== UserRole.SUPER_ADMIN) {
     return (
       <Layout>
@@ -93,32 +278,9 @@ export default function AdminPage() {
     );
   }
 
-  const handleConferenceClick = (conference: Conference) => {
-    console.log("Открыть конференцию:", conference);
-  };
-
-  const handleConferenceEdit = (conference: Conference) => {
-    console.log("Редактировать конференцию:", conference);
-  };
-
-  const handleApplicationClick = (application: ConferenceApplication) => {
-    setSelectedApplication(application);
-    setIsReviewModalOpen(true);
-  };
-
-  const handleApplicationReview = (application: ConferenceApplication) => {
-    setSelectedApplication(application);
-    setIsReviewModalOpen(true);
-  };
-
-  const handleReviewModalClose = () => {
-    setIsReviewModalOpen(false);
-    setSelectedApplication(null);
-  };
-
+  // ✅ ОСНОВНОЙ РЕНДЕР ПОСЛЕ ВСЕХ ПРОВЕРОК
   return (
     <Layout title="Админ панель - Система конференций">
-      {/* Основной контент страницы */}
       <div className="bg-gray-50 min-h-screen">
         {/* Заголовок страницы */}
         <div className="bg-white shadow-sm border-b border-gray-200">
@@ -132,6 +294,21 @@ export default function AdminPage() {
                 Добро пожаловать, {user.name}! Полный контроль над системой
                 конференций
               </p>
+              {dashboardStats && (
+                <div className="mt-3 flex items-center space-x-6 text-sm text-gray-600">
+                  <span>
+                    Конференций:{" "}
+                    <strong>{dashboardStats.totalConferences}</strong>
+                  </span>
+                  <span>
+                    Заявок: <strong>{dashboardStats.totalApplications}</strong>
+                  </span>
+                  <span>
+                    Пользователей:{" "}
+                    <strong>{dashboardStats.totalUsers || 0}</strong>
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -139,7 +316,14 @@ export default function AdminPage() {
         {/* Быстрая статистика */}
         <div className="bg-white border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <QuickSystemStats />
+            {statsError ? (
+              renderError(statsError, "Ошибка загрузки статистики")
+            ) : (
+              <QuickSystemStats
+                stats={dashboardStats}
+                isLoading={statsLoading}
+              />
+            )}
           </div>
         </div>
 
@@ -160,6 +344,7 @@ export default function AdminPage() {
                 icon={Calendar}
                 isActive={activeTab === "conferences"}
                 onClick={() => setActiveTab("conferences")}
+                badge={conferences.length}
               />
               <TabButton
                 id="applications"
@@ -167,6 +352,13 @@ export default function AdminPage() {
                 icon={FileText}
                 isActive={activeTab === "applications"}
                 onClick={() => setActiveTab("applications")}
+                badge={
+                  applications.filter(
+                    (app) =>
+                      app.status === "SUBMITTED" ||
+                      app.status === "UNDER_REVIEW"
+                  ).length
+                }
               />
               <TabButton
                 id="users"
@@ -174,13 +366,7 @@ export default function AdminPage() {
                 icon={Users}
                 isActive={activeTab === "users"}
                 onClick={() => setActiveTab("users")}
-              />
-              <TabButton
-                id="analytics"
-                label="Аналитика"
-                icon={TrendingUp}
-                isActive={activeTab === "analytics"}
-                onClick={() => setActiveTab("analytics")}
+                badge={dashboardStats?.totalUsers}
               />
             </nav>
           </div>
@@ -194,48 +380,127 @@ export default function AdminPage() {
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
                   Общая статистика системы
                 </h2>
-                <DashboardStats />
+                {statsError ? (
+                  renderError(statsError, "Ошибка загрузки статистики")
+                ) : (
+                  <DashboardStats
+                    stats={dashboardStats}
+                    showDetailedView={true}
+                    variant="admin"
+                  />
+                )}
               </div>
-              <SystemActivity />
-              <AdminAttentionRequired />
               <QuickActions />
             </div>
           )}
 
           {activeTab === "conferences" && (
-            <ConferencesList
-              onConferenceClick={handleConferenceClick}
-              onConferenceEdit={handleConferenceEdit}
-              showFilters={true}
-            />
+            <div className="space-y-6">
+              {conferencesError ? (
+                renderError(conferencesError, "Ошибка загрузки конференций")
+              ) : (
+                <>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">
+                        Управление конференциями
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Просматривайте и управляйте всеми конференциями в
+                        системе
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={RefreshCw}
+                      onClick={handleRefreshConferences}
+                    >
+                      Обновить
+                    </Button>
+                  </div>
+
+                  {conferencesLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                      <span className="ml-3 text-gray-600">
+                        Загрузка конференций...
+                      </span>
+                    </div>
+                  ) : (
+                    <ConferencesList
+                      conferences={conferences}
+                      onConferenceClick={handleConferenceClick}
+                      onConferenceEdit={handleConferenceEdit}
+                      onConferencePublish={handlePublishConference}
+                      showFilters={true}
+                      variant="admin"
+                      showCreateButton={true}
+                      showEditButton={true}
+                      showPublishButton={true}
+                      isLoading={conferencesLoading}
+                    />
+                  )}
+                </>
+              )}
+            </div>
           )}
 
           {activeTab === "applications" && (
-            <ApplicationsList
-              onApplicationClick={handleApplicationClick}
-              onApplicationReview={handleApplicationReview}
-              showFilters={true}
-              showOrganizerActions={true}
-            />
+            <div className="space-y-6">
+              {applicationsError ? (
+                renderError(applicationsError, "Ошибка загрузки заявок")
+              ) : (
+                <>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">
+                        Управление заявками
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Просматривайте и управляйте всеми заявками в системе
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={RefreshCw}
+                      onClick={handleRefreshData}
+                    >
+                      Обновить
+                    </Button>
+                  </div>
+
+                  <ApplicationsList
+                    applications={applications}
+                    onApplicationClick={handleApplicationClick}
+                    onApplicationReview={handleApplicationReview}
+                    onApplicationAccept={handleAcceptApplication}
+                    onApplicationReject={handleRejectApplication}
+                    onApplicationWaitlist={handleWaitlistApplication}
+                    showFilters={true}
+                    showOrganizerActions={true}
+                    variant="admin"
+                    isLoading={applicationsLoading}
+                  />
+                </>
+              )}
+            </div>
           )}
 
           {activeTab === "users" && <UsersManagement />}
-
-          {activeTab === "analytics" && <SystemAnalytics />}
         </div>
-
-        {/* Модальное окно рецензирования */}
-        {selectedApplication && (
-          <ApplicationReviewModal
-            application={selectedApplication}
-            isOpen={isReviewModalOpen}
-            onClose={handleReviewModalClose}
-            onUpdate={() => {
-              // TODO: Обновить данные после изменений
-            }}
-          />
-        )}
       </div>
+
+      {/* Модальное окно для просмотра заявки */}
+      {isReviewModalOpen && selectedApplication && (
+        <ApplicationReviewModal
+          application={selectedApplication}
+          isOpen={isReviewModalOpen}
+          onClose={handleReviewModalClose}
+          onUpdate={handleApplicationUpdate}
+        />
+      )}
     </Layout>
   );
 }
@@ -268,9 +533,9 @@ function TabButton({
     >
       <Icon className="h-4 w-4 mr-2" />
       {label}
-      {badge && (
+      {badge !== undefined && badge > 0 && (
         <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-          {badge}
+          {badge > 99 ? "99+" : badge}
         </span>
       )}
     </button>

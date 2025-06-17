@@ -1,11 +1,13 @@
 // src/components/admin/QuickActions.tsx
-
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Calendar, Users, Mail, Download } from "lucide-react";
+import { AddUserModal } from "./modals/AddUserModal";
 
 export function QuickActions() {
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+
   const actions = [
     {
       title: "Создать конференцию",
@@ -18,22 +20,8 @@ export function QuickActions() {
       title: "Добавить пользователя",
       description: "Создать нового пользователя",
       icon: Users,
-      action: () => console.log("Добавить пользователя"),
+      action: () => setIsAddUserModalOpen(true),
       color: "bg-green-500",
-    },
-    {
-      title: "Отправить уведомления",
-      description: "Массовая рассылка",
-      icon: Mail,
-      action: () => console.log("Отправить уведомления"),
-      color: "bg-purple-500",
-    },
-    {
-      title: "Экспорт данных",
-      description: "Скачать отчеты",
-      icon: Download,
-      action: () => console.log("Экспорт данных"),
-      color: "bg-orange-500",
     },
   ];
 
@@ -57,6 +45,11 @@ export function QuickActions() {
           </button>
         ))}
       </div>
+
+      <AddUserModal
+        open={isAddUserModalOpen}
+        onClose={() => setIsAddUserModalOpen(false)}
+      />
     </div>
   );
 }

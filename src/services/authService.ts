@@ -263,6 +263,7 @@ export const authApi = {
           isActive: true, // Пользователи, созданные админом, сразу активны
           organization: organization || null,
           phone: phone || null,
+          createdAt: new Date().toISOString(),
         }
       );
 

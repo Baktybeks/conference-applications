@@ -11,10 +11,6 @@ export const canManageConferences = (role: UserRole): boolean => {
   return [UserRole.SUPER_ADMIN, UserRole.ORGANIZER].includes(role);
 };
 
-export const canReviewApplications = (role: UserRole): boolean => {
-  return [UserRole.SUPER_ADMIN, UserRole.REVIEWER].includes(role);
-};
-
 export const canSubmitApplications = (role: UserRole): boolean => {
   return [UserRole.SUPER_ADMIN, UserRole.PARTICIPANT].includes(role);
 };
@@ -51,11 +47,6 @@ export const getAvailableActions = (role: UserRole): string[] => {
       "view_analytics",
       "export_conference_data",
     ],
-    [UserRole.REVIEWER]: [
-      "review_applications",
-      "view_assigned_applications",
-      "submit_reviews",
-    ],
     [UserRole.PARTICIPANT]: [
       "submit_applications",
       "view_conferences",
@@ -86,11 +77,6 @@ export const getAllowedRoutes = (role: UserRole): string[] => {
       "/organizer/applications",
       "/organizer/analytics",
     ],
-    [UserRole.REVIEWER]: [
-      "/reviewer",
-      "/reviewer/applications",
-      "/reviewer/reviews",
-    ],
     [UserRole.PARTICIPANT]: [
       "/participant",
       "/participant/conferences",
@@ -111,7 +97,6 @@ export const getHomeRoute = (role: UserRole): string => {
   const homeRoutes: Record<UserRole, string> = {
     [UserRole.SUPER_ADMIN]: "/admin",
     [UserRole.ORGANIZER]: "/organizer",
-    [UserRole.REVIEWER]: "/reviewer",
     [UserRole.PARTICIPANT]: "/participant",
   };
   return homeRoutes[role] || "/";
@@ -122,7 +107,6 @@ export const getRoleLabel = (role: UserRole): string => {
   const labels: Record<UserRole, string> = {
     [UserRole.SUPER_ADMIN]: "Супер администратор",
     [UserRole.ORGANIZER]: "Организатор",
-    [UserRole.REVIEWER]: "Рецензент",
     [UserRole.PARTICIPANT]: "Участник",
   };
   return labels[role];
@@ -132,7 +116,6 @@ export const getRoleColor = (role: UserRole): string => {
   const colors: Record<UserRole, string> = {
     [UserRole.SUPER_ADMIN]: "bg-red-100 text-red-800",
     [UserRole.ORGANIZER]: "bg-blue-100 text-blue-800",
-    [UserRole.REVIEWER]: "bg-green-100 text-green-800",
     [UserRole.PARTICIPANT]: "bg-purple-100 text-purple-800",
   };
   return colors[role];
@@ -142,7 +125,6 @@ export const getRoleDescription = (role: UserRole): string => {
   const descriptions: Record<UserRole, string> = {
     [UserRole.SUPER_ADMIN]: "Полный доступ к системе управления конференциями",
     [UserRole.ORGANIZER]: "Создание и управление конференциями",
-    [UserRole.REVIEWER]: "Рецензирование заявок на участие",
     [UserRole.PARTICIPANT]: "Подача заявок на участие в конференциях",
   };
   return descriptions[role];
@@ -152,7 +134,6 @@ export const getRolePriority = (role: UserRole): number => {
   const priorities: Record<UserRole, number> = {
     [UserRole.SUPER_ADMIN]: 4,
     [UserRole.ORGANIZER]: 3,
-    [UserRole.REVIEWER]: 2,
     [UserRole.PARTICIPANT]: 1,
   };
   return priorities[role];
@@ -245,15 +226,6 @@ export const getNavigationItems = (role: UserRole): NavigationGroup[] => {
     });
   }
 
-  if (canReviewApplications(role)) {
-    applicationItems.push({
-      href: "/reviewer/applications",
-      label: "На рецензирование",
-      icon: "Eye",
-      description: "Заявки для рецензирования",
-    });
-  }
-
   if (canSubmitApplications(role)) {
     applicationItems.push({
       href: "/participant/applications",
@@ -286,12 +258,6 @@ export const getNavigationItems = (role: UserRole): NavigationGroup[] => {
           label: "Пользователи",
           icon: "Users",
           description: "Управление пользователями",
-        },
-        {
-          href: "/admin/analytics",
-          label: "Аналитика",
-          icon: "BarChart3",
-          description: "Отчеты и статистика",
         },
         {
           href: "/admin/settings",

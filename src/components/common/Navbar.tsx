@@ -154,15 +154,6 @@ export function Navbar() {
       });
     }
 
-    if ([UserRole.SUPER_ADMIN, UserRole.REVIEWER].includes(user.role)) {
-      applicationItems.push({
-        href: "/reviewer/applications",
-        label: "На рецензирование",
-        icon: Eye,
-        description: "Заявки для рецензирования",
-      });
-    }
-
     if ([UserRole.SUPER_ADMIN, UserRole.PARTICIPANT].includes(user.role)) {
       applicationItems.push({
         href: "/participant/applications",
@@ -193,18 +184,6 @@ export function Navbar() {
           label: "Пользователи",
           icon: Users,
           description: "Управление пользователями",
-        },
-        {
-          href: "/admin/analytics",
-          label: "Аналитика",
-          icon: BarChart3,
-          description: "Отчеты и статистика",
-        },
-        {
-          href: "/admin/settings",
-          label: "Настройки",
-          icon: Settings,
-          description: "Настройки системы",
         },
       ];
 
@@ -241,8 +220,6 @@ export function Navbar() {
         return Shield;
       case UserRole.ORGANIZER:
         return Calendar;
-      case UserRole.REVIEWER:
-        return Eye;
       case UserRole.PARTICIPANT:
         return User;
       default:
@@ -311,19 +288,6 @@ export function Navbar() {
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">Подать заявку</span>
-                </Link>
-              )}
-
-              {[UserRole.SUPER_ADMIN, UserRole.ORGANIZER].includes(
-                user.role
-              ) && (
-                <Link
-                  href="/organizer/conferences/create"
-                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
-                  onClick={closeMenus}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Создать</span>
                 </Link>
               )}
 
@@ -442,8 +406,6 @@ function MobileMenu({
     user.role === UserRole.SUPER_ADMIN
       ? Shield
       : user.role === UserRole.ORGANIZER
-      ? Calendar
-      : user.role === UserRole.REVIEWER
       ? Eye
       : User;
 
@@ -554,8 +516,6 @@ function UserProfileDropdown({
     user.role === UserRole.SUPER_ADMIN
       ? Shield
       : user.role === UserRole.ORGANIZER
-      ? Calendar
-      : user.role === UserRole.REVIEWER
       ? Eye
       : User;
 
@@ -589,25 +549,6 @@ function UserProfileDropdown({
                 {getRoleLabel(user.role)}
               </span>
             </div>
-
-            {/* Ссылки профиля */}
-            <Link
-              href="/profile"
-              onClick={onClose}
-              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <User className="h-4 w-4 mr-3" />
-              Мой профиль
-            </Link>
-
-            <Link
-              href="/profile/settings"
-              onClick={onClose}
-              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <Settings className="h-4 w-4 mr-3" />
-              Настройки
-            </Link>
 
             <div className="border-t border-gray-100">
               <button
