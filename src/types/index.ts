@@ -689,3 +689,25 @@ export interface AdminStatsFilters extends StatsFilters {
   organizationFilter?: string;
   roleFilter?: UserRole[];
 }
+
+export interface CreateConferenceDto {
+  title: string;
+  description: string;
+  theme: ConferenceTheme;
+  participationType: ParticipationType;
+  startDate: string;
+  endDate: string;
+  location: string;
+  submissionDeadline: string;
+  contactEmail: string;
+  website?: string;
+  maxParticipants?: number;
+  registrationFee?: number;
+  requirements?: string;
+  tags?: string[];
+}
+
+// ДОБАВЛЕНО: DTO для обновления конференции
+export interface UpdateConferenceDto extends Partial<CreateConferenceDto> {
+  isPublished?: boolean;
+}
