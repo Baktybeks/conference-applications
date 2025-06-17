@@ -1,8 +1,14 @@
-// src/services/appwriteService.ts - ФУНКЦИОНАЛЬНАЯ ВЕРСИЯ
+// src/services/appwriteService.ts - ИСПРАВЛЕННАЯ ВЕРСИЯ
 
 import { Client, Account, Databases, ID, Query } from "appwrite";
 import { appwriteConfig } from "@/constants/appwriteConfig";
-import { User, UserRole, Conference, Application } from "@/types";
+import {
+  User,
+  UserRole,
+  Conference,
+  Application,
+  ApplicationStatus,
+} from "@/types";
 
 // Создание клиента Appwrite
 const client = new Client()
@@ -27,7 +33,7 @@ const mapUserDocument = (doc: any): User => {
     bio: doc.bio || "",
     phone: doc.phone || "",
     orcid: doc.orcid || "",
-    website: doc.website || "",
+    website: doc.website || "", // Fallback для отсутствующего поля
     createdAt: doc.createdAt,
   };
 };
@@ -47,7 +53,7 @@ const mapConferenceDocument = (doc: any): Conference => {
     participationType: doc.participationType,
     organizerId: doc.organizerId,
     contactEmail: doc.contactEmail,
-    website: doc.website || "",
+    website: doc.website || "", // Fallback для отсутствующего поля
     maxParticipants: doc.maxParticipants,
     registrationFee: doc.registrationFee || 0,
     isPublished: doc.isPublished,
@@ -88,7 +94,7 @@ const mapApplicationDocument = (doc: any): Application => {
   };
 };
 
-// ИСПРАВЛЕННАЯ функция создания аккаунта
+// Функция создания аккаунта
 export const createAccount = async (
   name: string,
   email: string,
@@ -108,22 +114,58 @@ export const createAccount = async (
   }
 };
 
-// ИСПРАВЛЕННАЯ функция создания документа пользователя
+// Вспомогательная функция для валидации и очистки URL
+const validateAndCleanUrl = (url?: string): string | undefined => {
+  if (!url || url.trim() === "") return undefined;
+
+  const cleanUrl = url.trim();
+
+  // Если URL не начинается с http:// или https://, добавляем https://
+  if (cleanUrl && !cleanUrl.match(/^https?:\/\//)) {
+    return `https://${cleanUrl}`;
+  }
+
+  // Проверяем валидность URL
+  try {
+    new URL(cleanUrl);
+    return cleanUrl;
+  } catch {
+    return undefined;
+  }
+};
+
+// Функция очистки данных от пустых URL полей
+const cleanDocumentData = (data: any) => {
+  const cleaned = { ...data };
+
+  // Очищаем website поле, если оно пустое или невалидное
+  if (cleaned.website !== undefined) {
+    const validWebsite = validateAndCleanUrl(cleaned.website);
+    if (validWebsite) {
+      cleaned.website = validWebsite;
+    } else {
+      delete cleaned.website; // Удаляем поле, если URL невалидный
+    }
+  }
+
+  return cleaned;
+};
+
+// Функция создания документа пользователя
 export const createUserDocument = async (
   userId: string,
   userData: Omit<User, "$id" | "$createdAt" | "$updatedAt">
 ) => {
   try {
-    // ИСПРАВЛЕНИЕ: Убеждаемся, что createdAt передается
-    const documentData = {
+    const documentData = cleanDocumentData({
       ...userData,
-      createdAt: userData.createdAt || new Date().toISOString(), // Гарантируем наличие createdAt
-    };
+      createdAt: userData.createdAt || new Date().toISOString(),
+    });
 
     const response = await databases.createDocument(
       appwriteConfig.databaseId,
       appwriteConfig.collections.users,
-      userId, // Используем userId из Auth как ID документа
+      userId,
       documentData
     );
 
@@ -163,7 +205,6 @@ export const getCurrentUser = async () => {
     const response = await account.get();
     return response;
   } catch (error: any) {
-    // Если пользователь не авторизован, это нормально
     if (error.code === 401) {
       return null;
     }
@@ -195,20 +236,22 @@ export const getUserById = async (userId: string): Promise<User | null> => {
   }
 };
 
-// ИСПРАВЛЕННАЯ функция обновления документа пользователя
+// Функция обновления документа пользователя
 export const updateUserDocument = async (
   userId: string,
   updates: Partial<User>
 ): Promise<User | null> => {
   try {
-    // Удаляем системные поля, которые нельзя обновлять
     const { $id, $createdAt, $updatedAt, ...updateData } = updates;
+
+    // Очищаем данные от невалидных URL
+    const cleanedData = cleanDocumentData(updateData);
 
     const response = await databases.updateDocument(
       appwriteConfig.databaseId,
       appwriteConfig.collections.users,
       userId,
-      updateData
+      cleanedData
     );
 
     return mapUserDocument(response);
@@ -224,7 +267,20 @@ export const logout = async () => {
     await account.deleteSession("current");
   } catch (error: any) {
     console.error("Ошибка при выходе:", error);
-    // Игнорируем ошибки выхода, так как пользователь может быть уже не авторизован
+  }
+};
+
+// Удаление аккаунта
+export const deleteAccount = async () => {
+  try {
+    // Сначала удаляем все сессии
+    await account.deleteSessions();
+    // Затем удаляем аккаунт
+    // Примечание: В Appwrite удаление аккаунта возможно только через админский API
+    // Здесь можно реализовать пометку аккаунта как удаленного
+  } catch (error: any) {
+    console.error("Ошибка при удалении аккаунта:", error);
+    throw new Error(error.message || "Ошибка при удалении аккаунта");
   }
 };
 
@@ -267,17 +323,19 @@ export const createConference = async (
   conferenceData: Omit<Conference, "$id" | "$createdAt" | "$updatedAt">
 ) => {
   try {
-    // ИСПРАВЛЕНИЕ: Добавляем createdAt
     const dataWithCreatedAt = {
       ...conferenceData,
       createdAt: conferenceData.createdAt || new Date().toISOString(),
     };
 
+    // Очищаем данные от невалидных URL
+    const cleanedData = cleanDocumentData(dataWithCreatedAt);
+
     const response = await databases.createDocument(
       appwriteConfig.databaseId,
       appwriteConfig.collections.conferences,
       ID.unique(),
-      dataWithCreatedAt
+      cleanedData
     );
 
     return mapConferenceDocument(response);
@@ -305,12 +363,59 @@ export const getConferences = async (
   }
 };
 
+// ДОБАВЛЕНО: Обновление конференции
+export const updateConference = async (
+  conferenceId: string,
+  updates: Partial<Conference>
+): Promise<Conference | null> => {
+  try {
+    const { $id, $createdAt, $updatedAt, ...updateData } = updates;
+
+    // Очищаем данные от невалидных URL
+    const cleanedData = cleanDocumentData(updateData);
+
+    const response = await databases.updateDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.collections.conferences,
+      conferenceId,
+      cleanedData
+    );
+
+    return mapConferenceDocument(response);
+  } catch (error: any) {
+    console.error("Ошибка обновления конференции:", error);
+    throw new Error(error.message || "Ошибка при обновлении конференции");
+  }
+};
+
+// ДОБАВЛЕНО: Получение конкретной конференции по ID
+export const getConferenceById = async (
+  conferenceId: string
+): Promise<Conference | null> => {
+  try {
+    const response = await databases.getDocument(
+      appwriteConfig.databaseId,
+      appwriteConfig.collections.conferences,
+      conferenceId
+    );
+
+    return mapConferenceDocument(response);
+  } catch (error: any) {
+    console.error("Ошибка получения конференции:", error);
+
+    if (error.code === 404) {
+      return null;
+    }
+
+    throw new Error(error.message || "Ошибка при получении конференции");
+  }
+};
+
 // Создание заявки
 export const createApplication = async (
   applicationData: Omit<Application, "$id" | "$createdAt" | "$updatedAt">
 ) => {
   try {
-    // ИСПРАВЛЕНИЕ: Добавляем createdAt
     const dataWithCreatedAt = {
       ...applicationData,
       createdAt: applicationData.createdAt || new Date().toISOString(),
@@ -331,44 +436,6 @@ export const createApplication = async (
 };
 
 // Получение заявок
-export const getApplications = async (
-  queries: string[] = []
-): Promise<Application[]> => {
-  try {
-    const response = await databases.listDocuments(
-      appwriteConfig.databaseId,
-      appwriteConfig.collections.applications,
-      queries
-    );
-
-    return response.documents.map(mapApplicationDocument);
-  } catch (error: any) {
-    console.error("Ошибка получения заявок:", error);
-    throw new Error(error.message || "Ошибка при получении заявок");
-  }
-};
-
-// Экспорт объекта с функциями для обратной совместимости
-export const appwriteService = {
-  createAccount,
-  createUserDocument,
-  createSession,
-  getCurrentUser,
-  getUserById,
-  updateUserDocument,
-  logout,
-  getUsers,
-  toggleUserActivation,
-  updateUserRole,
-  createConference,
-  getConferences,
-  createApplication,
-  getApplications,
-};
-
-// Экспорт по умолчанию
-export default appwriteService;
-
 export const getApplications = async (
   queries: string[] = []
 ): Promise<Application[]> => {
@@ -415,7 +482,6 @@ export const updateApplication = async (
   updates: Partial<Application>
 ): Promise<Application | null> => {
   try {
-    // Удаляем системные поля, которые нельзя обновлять
     const { $id, $createdAt, $updatedAt, ...updateData } = updates;
 
     const response = await databases.updateDocument(
@@ -564,7 +630,6 @@ export const getApplicationStats = async (filters?: {
       queries.push(Query.equal("participantId", filters.participantId));
     }
 
-    // Для организатора нужно получить заявки из всех его конференций
     if (filters?.organizerId) {
       const organizerConferences = await getConferences([
         Query.equal("organizerId", filters.organizerId),
@@ -574,7 +639,6 @@ export const getApplicationStats = async (filters?: {
       if (conferenceIds.length > 0) {
         queries.push(Query.equal("conferenceId", conferenceIds));
       } else {
-        // Если у организатора нет конференций, возвращаем пустую статистику
         return {
           total: 0,
           draft: 0,
@@ -622,9 +686,8 @@ export const getApplicationStats = async (filters?: {
   }
 };
 
-// Обновляем экспорт объекта appwriteService
+// Экспорт объекта с функциями
 export const appwriteService = {
-  // ... существующие методы
   createAccount,
   createUserDocument,
   createSession,
@@ -638,9 +701,9 @@ export const appwriteService = {
   updateUserRole,
   createConference,
   getConferences,
+  getConferenceById,
+  updateConference,
   createApplication,
-
-  // Новые методы для заявок
   getApplications,
   getApplicationById,
   updateApplication,
@@ -657,3 +720,6 @@ export const appwriteService = {
   waitlistApplication,
   getApplicationStats,
 };
+
+// Экспорт по умолчанию
+export default appwriteService;

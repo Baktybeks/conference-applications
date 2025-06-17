@@ -43,13 +43,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
     setIsClient(true);
   }, []);
 
-  // ИСПРАВЛЕНО: Подключаем синхронизацию auth cookie только на клиенте
   useSyncAuthCookie();
 
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {/* Рендерим devtools только на клиенте в dev режиме */}
       {isClient && process.env.NODE_ENV === "development" && (
         <ReactQueryDevtools initialIsOpen={false} />
       )}

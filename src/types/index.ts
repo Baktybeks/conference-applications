@@ -1,4 +1,4 @@
-// src/types/index.ts - ПОЛНАЯ ВЕРСИЯ
+// src/types/index.ts - ПОЛНАЯ ВЕРСИЯ С ДОБАВЛЕННЫМИ DTO
 
 // Роли пользователей
 export enum UserRole {
@@ -47,6 +47,47 @@ export enum PresentationType {
   PANEL = "PANEL",
 }
 
+// Вспомогательные функции для лейблов
+export const getPresentationTypeLabel = (type: PresentationType): string => {
+  const labels: Record<PresentationType, string> = {
+    [PresentationType.ORAL]: "Устный доклад",
+    [PresentationType.POSTER]: "Постерная презентация",
+    [PresentationType.WORKSHOP]: "Мастер-класс",
+    [PresentationType.KEYNOTE]: "Пленарный доклад",
+    [PresentationType.PANEL]: "Панельная дискуссия",
+  };
+  return labels[type];
+};
+
+export const getConferenceThemeLabel = (theme: ConferenceTheme): string => {
+  const labels: Record<ConferenceTheme, string> = {
+    [ConferenceTheme.COMPUTER_SCIENCE]: "Информатика",
+    [ConferenceTheme.MEDICINE]: "Медицина",
+    [ConferenceTheme.EDUCATION]: "Образование",
+    [ConferenceTheme.ENGINEERING]: "Инженерия",
+    [ConferenceTheme.BUSINESS]: "Бизнес",
+    [ConferenceTheme.SOCIAL_SCIENCES]: "Социальные науки",
+    [ConferenceTheme.NATURAL_SCIENCES]: "Естественные науки",
+    [ConferenceTheme.HUMANITIES]: "Гуманитарные науки",
+    [ConferenceTheme.OTHER]: "Другое",
+  };
+  return labels[theme];
+};
+
+export const getApplicationStatusLabel = (
+  status: ApplicationStatus
+): string => {
+  const labels: Record<ApplicationStatus, string> = {
+    [ApplicationStatus.DRAFT]: "Черновик",
+    [ApplicationStatus.SUBMITTED]: "Подана",
+    [ApplicationStatus.UNDER_REVIEW]: "На рассмотрении",
+    [ApplicationStatus.ACCEPTED]: "Принята",
+    [ApplicationStatus.REJECTED]: "Отклонена",
+    [ApplicationStatus.WAITLIST]: "Список ожидания",
+  };
+  return labels[status];
+};
+
 // Базовый интерфейс для документов Appwrite
 export interface BaseDocument {
   $id: string;
@@ -66,7 +107,6 @@ export interface User extends BaseDocument {
   phone: string;
   orcid: string;
   website: string;
-  createdAt: string;
 }
 
 // Конференция
@@ -126,6 +166,34 @@ export interface Application extends BaseDocument {
   certificateUrl: string;
 
   createdAt: string;
+}
+
+// ДОБАВЛЕНО: DTO для создания заявки
+export interface CreateApplicationDto {
+  conferenceId: string;
+  fullName: string;
+  organization: string;
+  position?: string;
+  email: string;
+  phone?: string;
+  hasPresentation: boolean;
+  presentationType?: PresentationType;
+  presentationTitle?: string;
+  abstract?: string;
+  keywords?: string[];
+  dietaryRestrictions?: string;
+  accessibilityNeeds?: string;
+  accommodationNeeded?: boolean;
+}
+
+// ДОБАВЛЕНО: DTO для обновления заявки
+export interface UpdateApplicationDto extends Partial<CreateApplicationDto> {
+  status?: ApplicationStatus;
+  assignedReviewerId?: string;
+  reviewerComments?: string;
+  attended?: boolean;
+  certificateIssued?: boolean;
+  certificateUrl?: string;
 }
 
 // ДОБАВЛЕНО: Алиас для обратной совместимости
@@ -308,10 +376,26 @@ export interface DashboardStats {
   systemHealth: number;
   storageUsed: number;
 
-  // Тренды
-  userGrowthRate?: number;
-  applicationGrowthRate?: number;
-  conferenceGrowthRate?: number;
+  // Дополнительные метрики для разных ролей
+  averageReviewTime?: number;
+  certificatesIssued?: number;
+  activeReviewers?: number;
+  completedConferences?: number;
+  upcomingDeadlines?: number;
+  overdueReviews?: number;
+
+  // Метрики качества
+  acceptanceRate?: number;
+  participationRate?: number;
+  satisfactionScore?: number;
+
+  // Финансовые метрики
+  totalRevenue?: number;
+  averageRegistrationFee?: number;
+
+  // Метрики времени
+  averageApplicationProcessingTime?: number;
+  averageConferenceDuration?: number;
 }
 
 // ДОБАВЛЕНО: Элементы системной активности
@@ -546,46 +630,6 @@ export interface DashboardStatsProps {
   filters?: StatsFilters;
   showDetailedView?: boolean;
   variant?: "admin" | "organizer" | "participant" | "reviewer";
-}
-
-// ОБНОВЛЕНО: Расширенная статистика с дополнительными метриками
-export interface DashboardStats {
-  totalUsers: number;
-  activeUsers: number;
-  totalConferences: number;
-  publishedConferences: number;
-  totalApplications: number;
-  pendingApplications: number;
-  acceptedApplications: number;
-  rejectedApplications: number;
-
-  // Дополнительная статистика
-  newUsersThisMonth: number;
-  newConferencesThisMonth: number;
-  newApplicationsThisMonth: number;
-  systemHealth: number;
-  storageUsed: number;
-
-  // Дополнительные метрики для разных ролей
-  averageReviewTime?: number;
-  certificatesIssued?: number;
-  activeReviewers?: number;
-  completedConferences?: number;
-  upcomingDeadlines?: number;
-  overdueReviews?: number;
-
-  // Метрики качества
-  acceptanceRate?: number;
-  participationRate?: number;
-  satisfactionScore?: number;
-
-  // Финансовые метрики
-  totalRevenue?: number;
-  averageRegistrationFee?: number;
-
-  // Метрики времени
-  averageApplicationProcessingTime?: number;
-  averageConferenceDuration?: number;
 }
 
 // ДОБАВЛЕНО: Статистика по периодам

@@ -80,6 +80,11 @@ function LoginForm() {
   // Перенаправление после успешного входа
   useEffect(() => {
     if (user && user.isActive) {
+      console.log(
+        user,
+        "user+++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+      );
+
       toast.success(`Добро пожаловать, ${user.name}!`, {
         position: "top-right",
         autoClose: 3000,
@@ -138,6 +143,10 @@ function LoginForm() {
   const redirectByRole = (role: UserRole) => {
     switch (role) {
       case UserRole.SUPER_ADMIN:
+        console.log(
+          "SUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMIN"
+        );
+
         router.push("/admin");
         break;
       case UserRole.ORGANIZER:

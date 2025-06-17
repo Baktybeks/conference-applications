@@ -35,6 +35,10 @@ import {
 import { SystemAnalytics } from "@/components/analytics/SystemAnalytics";
 
 export default function AdminPage() {
+  console.log(
+    "SUPER_ADMIN opeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeen"
+  );
+
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<
     | "dashboard"
@@ -186,17 +190,6 @@ export default function AdminPage() {
               <TrendingUp className="inline h-4 w-4 mr-2" />
               Аналитика
             </button>
-            <button
-              onClick={() => setActiveTab("settings")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === "settings"
-                  ? "border-indigo-500 text-indigo-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <Settings className="inline h-4 w-4 mr-2" />
-              Системные настройки
-            </button>
           </nav>
         </div>
       </div>
@@ -254,12 +247,6 @@ export default function AdminPage() {
         {activeTab === "analytics" && (
           <div>
             <SystemAnalytics />
-          </div>
-        )}
-
-        {activeTab === "settings" && (
-          <div>
-            <SystemSettings />
           </div>
         )}
       </div>
@@ -437,9 +424,7 @@ function SystemActivity() {
   );
 }
 
-// Компонент элементов, требующих внимания администратора
 function AdminAttentionRequired() {
-  // TODO: Получить реальные данные
   const items = [
     {
       id: "1",
@@ -458,24 +443,6 @@ function AdminAttentionRequired() {
       urgency: "medium",
       action: "Назначить рецензентов",
       count: 23,
-    },
-    {
-      id: "3",
-      type: "storage_warning",
-      title: "Место на диске заканчивается",
-      description: "Использовано 85% доступного места для файлов",
-      urgency: "medium",
-      action: "Очистить место",
-      count: 85,
-    },
-    {
-      id: "4",
-      type: "system_updates",
-      title: "Доступны обновления системы",
-      description: "Рекомендуется обновить компоненты безопасности",
-      urgency: "low",
-      action: "Обновить систему",
-      count: 3,
     },
   ];
 
@@ -610,259 +577,6 @@ function UsersManagement() {
       <p className="text-gray-600">
         Расширенная аналитика и отчеты будут доступны в следующей версии
       </p>
-    </div>
-  );
-}
-
-function SystemSettings() {
-  return (
-    <div className="max-w-4xl space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900">
-        Системные настройки
-      </h2>
-
-      {/* Общие настройки */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          Общие настройки системы
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Название системы
-            </label>
-            <input
-              type="text"
-              defaultValue="Система управления конференциями"
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email администратора
-            </label>
-            <input
-              type="email"
-              defaultValue="admin@conference-system.com"
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Часовой пояс
-            </label>
-            <select className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              <option value="Europe/Moscow">Europe/Moscow (GMT+3)</option>
-              <option value="Europe/Kiev">Europe/Kiev (GMT+2)</option>
-              <option value="Asia/Almaty">Asia/Almaty (GMT+6)</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Язык системы
-            </label>
-            <select className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-              <option value="ru">Русский</option>
-              <option value="en">English</option>
-              <option value="kk">Қазақша</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Настройки регистрации */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          Настройки регистрации
-        </h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Автоматическая активация пользователей
-              </p>
-              <p className="text-sm text-gray-500">
-                Новые пользователи активируются без одобрения администратора
-              </p>
-            </div>
-            <button className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-              <span className="translate-x-0 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-            </button>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Требовать подтверждение email
-              </p>
-              <p className="text-sm text-gray-500">
-                Пользователи должны подтвердить email при регистрации
-              </p>
-            </div>
-            <button className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-indigo-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-              <span className="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-            </button>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Открытая регистрация
-              </p>
-              <p className="text-sm text-gray-500">
-                Любой может зарегистрироваться в системе
-              </p>
-            </div>
-            <button className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-indigo-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-              <span className="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Настройки уведомлений */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          Настройки уведомлений
-        </h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Email уведомления о новых заявках
-              </p>
-              <p className="text-sm text-gray-500">
-                Отправлять организаторам уведомления о новых заявках
-              </p>
-            </div>
-            <button className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-indigo-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-              <span className="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-            </button>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Напоминания о дедлайнах
-              </p>
-              <p className="text-sm text-gray-500">
-                Напоминать участникам о приближающихся дедлайнах
-              </p>
-            </div>
-            <button className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-indigo-600 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-              <span className="translate-x-5 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-            </button>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Дайджест активности
-              </p>
-              <p className="text-sm text-gray-500">
-                Еженедельный отчет о системной активности
-              </p>
-            </div>
-            <button className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-              <span className="translate-x-0 pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"></span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Настройки безопасности */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          Настройки безопасности
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Время сессии (минуты)
-            </label>
-            <input
-              type="number"
-              defaultValue="480"
-              min="30"
-              max="1440"
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Максимальные попытки входа
-            </label>
-            <input
-              type="number"
-              defaultValue="5"
-              min="3"
-              max="10"
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Минимальная длина пароля
-            </label>
-            <input
-              type="number"
-              defaultValue="8"
-              min="6"
-              max="20"
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Время блокировки аккаунта (минуты)
-            </label>
-            <input
-              type="number"
-              defaultValue="15"
-              min="5"
-              max="60"
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Настройки файлов */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          Настройки файлов
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Максимальный размер файла (МБ)
-            </label>
-            <input
-              type="number"
-              defaultValue="10"
-              min="1"
-              max="100"
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Разрешенные типы файлов
-            </label>
-            <input
-              type="text"
-              defaultValue="pdf,doc,docx,txt,jpg,png"
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Кнопки действий */}
-      <div className="flex justify-end space-x-4">
-        <button className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-          Отменить
-        </button>
-        <button className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-          Сохранить настройки
-        </button>
-      </div>
     </div>
   );
 }

@@ -1,54 +1,38 @@
 // src/hooks/useSyncAuthCookie.ts
+
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/authStore";
 
+/**
+ * Хук для синхронизации состояния аутентификации с cookies
+ * Необходим для работы middleware, который читает состояние из cookies
+ */
 export function useSyncAuthCookie() {
-  const { user, setUser, clearUser } = useAuthStore();
+  const { user } = useAuthStore();
 
   useEffect(() => {
-    // Синхронизируем состояние с localStorage только на клиенте
-    if (typeof window !== "undefined") {
-      const checkAuthState = () => {
-        try {
-          const authData = localStorage.getItem("auth-storage");
-
-          if (authData) {
-            const parsed = JSON.parse(authData);
-            const localUser = parsed.state?.user;
-
-            // Если пользователь в localStorage отличается от текущего состояния
-            if (JSON.stringify(localUser) !== JSON.stringify(user)) {
-              if (localUser && localUser.$id && localUser.isActive) {
-                setUser(localUser);
-              } else {
-                clearUser();
-              }
-            }
-          } else if (user) {
-            // Если localStorage пуст, но пользователь есть в состоянии - очищаем
-            clearUser();
-          }
-        } catch (error) {
-          console.error("Ошибка при синхронизации auth state:", error);
-          clearUser();
-        }
+    // Функция для обновления cookie
+    const updateAuthCookie = () => {
+      const authData = {
+        state: {
+          user: user,
+        },
       };
 
-      // Проверяем сразу
-      checkAuthState();
+      // Устанавливаем cookie с тем же именем, что используется в Zustand persist
+      document.cookie = `auth-storage=${encodeURIComponent(
+        JSON.stringify(authData)
+      )}; path=/; max-age=86400; SameSite=Lax`;
+    };
 
-      // Следим за изменениями localStorage
-      const handleStorageChange = (e: StorageEvent) => {
-        if (e.key === "auth-storage") {
-          checkAuthState();
-        }
-      };
+    // Обновляем cookie при изменении пользователя
+    updateAuthCookie();
+  }, [user]);
 
-      window.addEventListener("storage", handleStorageChange);
-
-      return () => {
-        window.removeEventListener("storage", handleStorageChange);
-      };
-    }
-  }, [user, setUser, clearUser]);
+  // Очистка cookie при размонтировании (опционально)
+  useEffect(() => {
+    return () => {
+      // При необходимости можно добавить логику очистки
+    };
+  }, []);
 }
