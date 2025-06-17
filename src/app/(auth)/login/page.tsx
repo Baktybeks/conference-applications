@@ -1,4 +1,4 @@
-// src/app/(auth)/login/page.tsx
+// src/app/(auth)/login/page.tsx - ИСПРАВЛЕННАЯ ВЕРСИЯ
 
 "use client";
 
@@ -6,6 +6,8 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthCookieSync } from "@/utils/cookieSync";
+import { AuthDiagnostics } from "@/components/AuthDiagnostics";
 import Layout from "@/components/common/Layout";
 import { toast } from "react-toastify";
 import {
@@ -36,7 +38,6 @@ function LoginNotifications() {
 
     if (registered === "true") {
       if (activated === "true") {
-        // Супер-администратор - автоактивирован
         toast.success(
           "🎉 Регистрация завершена! Аккаунт активирован, можете войти в систему.",
           {
@@ -45,7 +46,6 @@ function LoginNotifications() {
           }
         );
       } else if (activation === "pending") {
-        // Обычный пользователь - ожидает активации
         toast.info(
           "⏳ Регистрация завершена! Ваш аккаунт ожидает активации администратором.",
           {
@@ -54,7 +54,6 @@ function LoginNotifications() {
           }
         );
       } else {
-        // Общее сообщение о регистрации
         toast.success("✅ Регистрация завершена успешно!", {
           position: "top-center",
           autoClose: 5000,
@@ -77,19 +76,45 @@ function LoginForm() {
   const { login, error, clearError, loading, user } = useAuth();
   const router = useRouter();
 
-  // Перенаправление после успешного входа
+  // ИСПРАВЛЕНИЕ: Автоматическая синхронизация cookies
+  useAuthCookieSync(user);
+
+  // ИСПРАВЛЕННЫЙ useEffect с детальным логированием
   useEffect(() => {
+    console.log("🔍 LoginForm useEffect - проверка пользователя:", {
+      user,
+      userActive: user?.isActive,
+      userRole: user?.role,
+      timestamp: new Date().toISOString(),
+    });
+
     if (user && user.isActive) {
-      console.log(
-        user,
-        "user+++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-      );
+      console.log("✅ Пользователь активен, начинаем редирект");
+      console.log("👤 Данные пользователя:", {
+        id: user.$id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+      });
 
       toast.success(`Добро пожаловать, ${user.name}!`, {
         position: "top-right",
         autoClose: 3000,
       });
-      redirectByRole(user.role);
+
+      // ИСПРАВЛЕНИЕ: Добавляем небольшую задержку для обновления cookies
+      setTimeout(() => {
+        console.log("🚀 Выполняем редирект через 500мс");
+        redirectByRole(user.role);
+      }, 500);
+    } else if (user && !user.isActive) {
+      console.log("⚠️ Пользователь найден, но не активирован");
+      setErrorMessage("⚠️ Ваш аккаунт еще не активирован администратором.");
+    } else if (user === null) {
+      console.log("❌ Пользователь не найден (null)");
+    } else {
+      console.log("⏳ Пользователь еще загружается или undefined");
     }
   }, [user, router]);
 
@@ -99,10 +124,17 @@ function LoginForm() {
     clearError();
     setIsSubmitting(true);
 
+    console.log("📤 Начинаем отправку формы входа");
+
     try {
-      await login(email, password);
+      console.log("🔑 Вызываем функцию login");
+      const loginResult = await login(email, password);
+      console.log("✅ Login успешен, результат:", loginResult);
+
       // Перенаправление теперь будет происходить в useEffect
+      console.log("⏳ Ожидаем обновления состояния для редиректа");
     } catch (error: any) {
+      console.error("❌ Ошибка при входе:", error);
       const message = error?.message || "Ошибка при входе";
 
       // Показываем специфичные сообщения в блоке ошибок формы
@@ -139,29 +171,56 @@ function LoginForm() {
     }
   };
 
-  // Функция перенаправления на основе роли пользователя
+  // ИСПРАВЛЕННАЯ функция перенаправления с логированием
   const redirectByRole = (role: UserRole) => {
+    console.log("🎯 redirectByRole вызвана с ролью:", role);
+
+    let targetPath: string;
+
     switch (role) {
       case UserRole.SUPER_ADMIN:
-        console.log(
-          "SUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMINSUPER_ADMIN"
-        );
-
-        router.push("/admin");
+        targetPath = "/admin";
+        console.log("👑 Редирект для SUPER_ADMIN на /admin");
         break;
       case UserRole.ORGANIZER:
-        router.push("/organizer");
+        targetPath = "/organizer";
+        console.log("📋 Редирект для ORGANIZER на /organizer");
         break;
       case UserRole.REVIEWER:
-        router.push("/reviewer");
+        targetPath = "/reviewer";
+        console.log("✍️ Редирект для REVIEWER на /reviewer");
         break;
       case UserRole.PARTICIPANT:
-        router.push("/participant");
+        targetPath = "/participant";
+        console.log("🎓 Редирект для PARTICIPANT на /participant");
         break;
       default:
-        router.push("/");
+        targetPath = "/";
+        console.log("❓ Неизвестная роль, редирект на главную");
+    }
+
+    console.log(`🚀 Выполняем router.push('${targetPath}')`);
+
+    try {
+      router.push(targetPath);
+      console.log("✅ router.push выполнен успешно");
+    } catch (error) {
+      console.error("❌ Ошибка при выполнении router.push:", error);
     }
   };
+
+  // Дополнительное логирование состояния компонента
+  useEffect(() => {
+    console.log("📊 Состояние LoginForm:", {
+      loading,
+      error,
+      user: user
+        ? { id: user.$id, role: user.role, active: user.isActive }
+        : null,
+      isSubmitting,
+      errorMessage,
+    });
+  }, [loading, error, user, isSubmitting, errorMessage]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center px-4">
@@ -179,6 +238,17 @@ function LoginForm() {
 
         {/* Форма входа */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          {/* DEBUG: Информация о состоянии (удалить в продакшене) */}
+          {process.env.NODE_ENV === "development" && (
+            <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
+              <strong>DEBUG:</strong> User:{" "}
+              {user
+                ? `${user.role} (${user.isActive ? "active" : "inactive"})`
+                : "null"}
+              , Loading: {loading ? "true" : "false"}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Сообщение об ошибке */}
             {(error || errorMessage) && (
@@ -380,6 +450,7 @@ export default function LoginPage() {
       <Suspense fallback={<LoginPageFallback />}>
         <LoginNotifications />
         <LoginForm />
+        <AuthDiagnostics />
       </Suspense>
     </Layout>
   );

@@ -1,33 +1,41 @@
-// src/components/common/Layout.tsx
+// src/components/common/Layout.tsx - ИСПРАВЛЕННАЯ ВЕРСИЯ с Navbar
 
-import { ReactNode } from "react";
+"use client";
+
+import React from "react";
+import { Navbar } from "@/components/common/Navbar";
+import { AuthDiagnostics } from "@/components/AuthDiagnostics";
 import Head from "next/head";
 
 interface LayoutProps {
-  children: ReactNode;
+  children: React.ReactNode;
   title?: string;
   description?: string;
+  showNavbar?: boolean;
+  className?: string;
 }
 
 export default function Layout({
   children,
-  title = "Система управления конференциями",
-  description = "Платформа для подачи заявок и управления научными конференциями",
+  title = "Система конференций",
+  description = "Система управления научными конференциями",
+  showNavbar = true,
+  className = "",
 }: LayoutProps) {
-  const pageTitle =
-    title === "Система управления конференциями"
-      ? title
-      : `${title} | Система управления конференциями`;
-
   return (
     <>
       <Head>
-        <title>{pageTitle}</title>
+        <title>{title}</title>
         <meta name="description" content={description} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className="min-h-screen">{children}</main>
+
+      <div className={`min-h-screen bg-gray-50 ${className}`}>
+        {showNavbar && <Navbar />}
+        <main className={showNavbar ? "" : "pt-0"}>{children}</main>
+        <AuthDiagnostics />
+      </div>
     </>
   );
 }

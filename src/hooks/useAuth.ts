@@ -1,14 +1,38 @@
-// src/hooks/useAuth.ts - ИСПРАВЛЕННАЯ ВЕРСИЯ
+// src/hooks/useAuth.ts - РАСШИРЕННАЯ ВЕРСИЯ с проверками прав
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { appwriteService } from "@/services/appwriteService";
 import { User, UserRole } from "@/types";
 import { toast } from "react-toastify";
+import { updateAuthCookie } from "@/utils/cookieSync";
+import {
+  canManageUsers,
+  canManageConferences,
+  canReviewApplications,
+  canSubmitApplications,
+  canViewAllData,
+  canCreateConferences,
+  canManageSystem,
+  getAvailableActions,
+  canAccessRoute,
+  getHomeRoute,
+} from "@/utils/permissions";
 
 interface AuthState {
   user: User | null;
   loading: boolean;
   error: string | null;
+}
+
+interface AuthPermissions {
+  canManageUsers: boolean;
+  canManageConferences: boolean;
+  canReviewApplications: boolean;
+  canSubmitApplications: boolean;
+  canViewAllData: boolean;
+  canCreateConferences: boolean;
+  canManageSystem: boolean;
+  availableActions: string[];
 }
 
 export function useAuth() {
@@ -17,6 +41,8 @@ export function useAuth() {
     loading: true,
     error: null,
   });
+
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const clearError = useCallback(() => {
     setState((prev) => ({ ...prev, error: null }));
@@ -27,7 +53,11 @@ export function useAuth() {
   }, []);
 
   const setUser = useCallback((user: User | null) => {
+    console.log("🔐 setUser вызван с пользователем:", user);
     setState((prev) => ({ ...prev, user, loading: false, error: null }));
+
+    // Синхронизируем cookies для middleware
+    updateAuthCookie(user);
   }, []);
 
   const setLoading = useCallback((loading: boolean) => {
@@ -38,24 +68,27 @@ export function useAuth() {
   useEffect(() => {
     const checkCurrentUser = async () => {
       try {
+        console.log("🔍 Проверка текущего пользователя...");
         setLoading(true);
         const currentUser = await appwriteService.getCurrentUser();
 
         if (currentUser) {
-          // Получаем полную информацию о пользователе из базы данных
+          console.log("✅ Найден текущий пользователь:", currentUser);
           const userDoc = await appwriteService.getUserById(currentUser.$id);
           if (userDoc) {
+            console.log("📝 Данные пользователя из БД:", userDoc);
             setUser(userDoc);
           } else {
-            // Пользователь есть в системе аутентификации, но нет в базе данных
+            console.log("❌ Пользователь не найден в БД, выход из системы");
             await appwriteService.logout();
             setUser(null);
           }
         } else {
+          console.log("❌ Текущий пользователь не найден");
           setUser(null);
         }
       } catch (error) {
-        console.error("Ошибка при проверке пользователя:", error);
+        console.error("❌ Ошибка при проверке пользователя:", error);
         setUser(null);
       } finally {
         setLoading(false);
@@ -65,7 +98,72 @@ export function useAuth() {
     checkCurrentUser();
   }, []);
 
-  // ИСПРАВЛЕННАЯ функция регистрации
+  // Функция входа
+  const login = useCallback(
+    async (email: string, password: string) => {
+      try {
+        console.log("🚀 Начало процесса входа для:", email);
+        setLoading(true);
+        clearError();
+
+        console.log("🔑 Создание сессии...");
+        const session = await appwriteService.createSession(email, password);
+
+        if (!session) {
+          throw new Error("Неверный email или пароль");
+        }
+        console.log("✅ Сессия создана:", session);
+
+        console.log("👤 Получение данных пользователя...");
+        const authUser = await appwriteService.getCurrentUser();
+
+        if (!authUser) {
+          throw new Error("Не удалось получить данные пользователя");
+        }
+        console.log("✅ Данные пользователя получены:", authUser);
+
+        console.log("📊 Получение профиля из БД...");
+        const userDoc = await appwriteService.getUserById(authUser.$id);
+
+        if (!userDoc) {
+          console.log("❌ Профиль не найден в БД, выход");
+          await appwriteService.logout();
+          throw new Error("Профиль пользователя не найден");
+        }
+        console.log("✅ Профиль получен:", userDoc);
+
+        if (!userDoc.isActive) {
+          console.log("⚠️ Аккаунт не активирован, выход");
+          await appwriteService.logout();
+          throw new Error("Аккаунт не активирован администратором");
+        }
+
+        console.log(
+          "🎉 Успешный вход! Роль:",
+          userDoc.role,
+          "Активен:",
+          userDoc.isActive
+        );
+        setUser(userDoc);
+
+        setTimeout(() => {
+          console.log("🔍 Проверка состояния через 100мс:", state.user);
+        }, 100);
+
+        return userDoc;
+      } catch (error: any) {
+        console.error("❌ Ошибка при входе:", error);
+        const message = error?.message || "Ошибка при входе";
+        setError(message);
+        throw new Error(message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [clearError, setLoading, setError, setUser, state.user]
+  );
+
+  // Функция регистрации
   const register = useCallback(
     async (
       name: string,
@@ -79,7 +177,6 @@ export function useAuth() {
         setLoading(true);
         clearError();
 
-        // Создаем аккаунт в Appwrite Auth
         const authUser = await appwriteService.createAccount(
           name,
           email,
@@ -90,28 +187,25 @@ export function useAuth() {
           throw new Error("Не удалось создать аккаунт");
         }
 
-        // ИСПРАВЛЕНИЕ: Добавляем поле createdAt при создании документа пользователя
-        const userData: Omit<User, "$id" | "$createdAt" | "$updatedAt"> = {
+        const userData: Omit<User, "$id" | "$updatedAt"> = {
           name,
           email,
           role,
-          isActive: role === UserRole.SUPER_ADMIN, // Супер-админ активируется автоматически
+          isActive: role === UserRole.SUPER_ADMIN,
           organization: organization || "",
           position: "",
           bio: "",
           phone: phone || "",
           orcid: "",
           website: "",
-          createdAt: new Date().toISOString(), // ИСПРАВЛЕНИЕ: Явно указываем createdAt
+          $createdAt: new Date().toISOString(),
         };
 
-        // Создаем документ пользователя в базе данных
         const userDoc = await appwriteService.createUserDocument(
           authUser.$id,
           userData
         );
 
-        // Выход из системы для обычных пользователей (они должны быть активированы)
         if (role !== UserRole.SUPER_ADMIN) {
           await appwriteService.logout();
         }
@@ -128,69 +222,20 @@ export function useAuth() {
     [clearError, setLoading, setError]
   );
 
-  // ИСПРАВЛЕННАЯ функция входа
-  const login = useCallback(
-    async (email: string, password: string) => {
-      try {
-        setLoading(true);
-        clearError();
-
-        // Авторизация в Appwrite
-        const session = await appwriteService.createSession(email, password);
-
-        if (!session) {
-          throw new Error("Неверный email или пароль");
-        }
-
-        // Получаем текущего пользователя
-        const authUser = await appwriteService.getCurrentUser();
-
-        if (!authUser) {
-          throw new Error("Не удалось получить данные пользователя");
-        }
-
-        // Получаем документ пользователя из базы данных
-        const userDoc = await appwriteService.getUserById(authUser.$id);
-
-        if (!userDoc) {
-          await appwriteService.logout();
-          throw new Error("Профиль пользователя не найден");
-        }
-
-        // Проверяем, активирован ли аккаунт
-        if (!userDoc.isActive) {
-          await appwriteService.logout();
-          throw new Error("Аккаунт не активирован администратором");
-        }
-
-        setUser(userDoc);
-        return userDoc;
-      } catch (error: any) {
-        const message = error?.message || "Ошибка при входе";
-        setError(message);
-        throw new Error(message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [clearError, setLoading, setError, setUser]
-  );
-
   // Функция выхода
   const logout = useCallback(async () => {
     try {
-      setLoading(true);
+      setIsLoggingOut(true);
       await appwriteService.logout();
       setUser(null);
       toast.success("Вы успешно вышли из системы");
     } catch (error: any) {
       console.error("Ошибка при выходе:", error);
-      // Даже если есть ошибка, очищаем локальное состояние
       setUser(null);
     } finally {
-      setLoading(false);
+      setIsLoggingOut(false);
     }
-  }, [setLoading, setUser]);
+  }, [setUser]);
 
   // Функция обновления профиля
   const updateProfile = useCallback(
@@ -225,16 +270,192 @@ export function useAuth() {
     [state.user, setLoading, setUser, setError]
   );
 
+  // Вычисляемые разрешения пользователя
+  const permissions = useMemo((): AuthPermissions => {
+    if (!state.user) {
+      return {
+        canManageUsers: false,
+        canManageConferences: false,
+        canReviewApplications: false,
+        canSubmitApplications: false,
+        canViewAllData: false,
+        canCreateConferences: false,
+        canManageSystem: false,
+        availableActions: [],
+      };
+    }
+
+    return {
+      canManageUsers: canManageUsers(state.user.role),
+      canManageConferences: canManageConferences(state.user.role),
+      canReviewApplications: canReviewApplications(state.user.role),
+      canSubmitApplications: canSubmitApplications(state.user.role),
+      canViewAllData: canViewAllData(state.user.role),
+      canCreateConferences: canCreateConferences(state.user.role),
+      canManageSystem: canManageSystem(state.user.role),
+      availableActions: getAvailableActions(state.user.role),
+    };
+  }, [state.user]);
+
+  // Функция проверки доступа к маршруту
+  const checkRouteAccess = useCallback(
+    (route: string): boolean => {
+      if (!state.user) return false;
+      return canAccessRoute(state.user.role, route);
+    },
+    [state.user]
+  );
+
+  // Функция получения домашнего маршрута
+  const getHomePath = useCallback((): string => {
+    if (!state.user) return "/login";
+    return getHomeRoute(state.user.role);
+  }, [state.user]);
+
+  // Функция проверки конкретного разрешения
+  const hasPermission = useCallback(
+    (action: string): boolean => {
+      return permissions.availableActions.includes(action);
+    },
+    [permissions.availableActions]
+  );
+
+  // Функция проверки роли
+  const hasRole = useCallback(
+    (role: UserRole | UserRole[]): boolean => {
+      if (!state.user) return false;
+
+      if (Array.isArray(role)) {
+        return role.includes(state.user.role);
+      }
+
+      return state.user.role === role;
+    },
+    [state.user]
+  );
+
+  // Функция проверки минимальной роли
+  const hasMinimumRole = useCallback(
+    (minimumRole: UserRole): boolean => {
+      if (!state.user) return false;
+
+      const rolePriorities = {
+        [UserRole.PARTICIPANT]: 1,
+        [UserRole.REVIEWER]: 2,
+        [UserRole.ORGANIZER]: 3,
+        [UserRole.SUPER_ADMIN]: 4,
+      };
+
+      return rolePriorities[state.user.role] >= rolePriorities[minimumRole];
+    },
+    [state.user]
+  );
+
+  // Логирование изменений состояния
+  useEffect(() => {
+    console.log("🔄 Состояние useAuth изменилось:", {
+      user: state.user,
+      loading: state.loading,
+      error: state.error,
+      isAuthenticated: !!state.user,
+      userRole: state.user?.role,
+      userActive: state.user?.isActive,
+      permissions,
+    });
+  }, [state, permissions]);
+
   return {
+    // Основные данные
     user: state.user,
     loading: state.loading,
     error: state.error,
+    isLoggingOut,
+
+    // Функции
     register,
     login,
     logout,
     updateProfile,
     clearError,
+
+    // Утилиты
     isAuthenticated: !!state.user,
     isLoading: state.loading,
+
+    // Разрешения
+    ...permissions,
+
+    // Функции проверки
+    checkRouteAccess,
+    getHomePath,
+    hasPermission,
+    hasRole,
+    hasMinimumRole,
+
+    // Дополнительные удобные функции
+    canManageUsers: permissions.canManageUsers,
+    canManageRequests: permissions.canManageConferences, // Алиас для совместимости
+    canCreateRequests: permissions.canSubmitApplications, // Алиас для совместимости
   };
+}
+
+// Хук для проверки конкретных разрешений
+export function usePermissions(requiredPermissions: string | string[]) {
+  const { hasPermission, user, loading } = useAuth();
+
+  const permissions = useMemo(() => {
+    if (loading || !user) {
+      return {
+        loading,
+        hasAccess: false,
+        missingPermissions: Array.isArray(requiredPermissions)
+          ? requiredPermissions
+          : [requiredPermissions],
+      };
+    }
+
+    const permissionsArray = Array.isArray(requiredPermissions)
+      ? requiredPermissions
+      : [requiredPermissions];
+    const missingPermissions = permissionsArray.filter(
+      (permission) => !hasPermission(permission)
+    );
+
+    return {
+      loading: false,
+      hasAccess: missingPermissions.length === 0,
+      missingPermissions,
+    };
+  }, [hasPermission, user, loading, requiredPermissions]);
+
+  return permissions;
+}
+
+// Хук для проверки ролей
+export function useRoleCheck(requiredRoles: UserRole | UserRole[]) {
+  const { hasRole, user, loading } = useAuth();
+
+  const roleCheck = useMemo(() => {
+    if (loading || !user) {
+      return {
+        loading,
+        hasAccess: false,
+        userRole: null,
+        requiredRoles: Array.isArray(requiredRoles)
+          ? requiredRoles
+          : [requiredRoles],
+      };
+    }
+
+    return {
+      loading: false,
+      hasAccess: hasRole(requiredRoles),
+      userRole: user.role,
+      requiredRoles: Array.isArray(requiredRoles)
+        ? requiredRoles
+        : [requiredRoles],
+    };
+  }, [hasRole, user, loading, requiredRoles]);
+
+  return roleCheck;
 }

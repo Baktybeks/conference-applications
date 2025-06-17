@@ -127,7 +127,6 @@ export interface Conference extends BaseDocument {
   isPublished: boolean;
   requirements: string;
   tags: string[];
-  createdAt: string;
 }
 
 // Заявка на участие
@@ -164,8 +163,6 @@ export interface Application extends BaseDocument {
   attended: boolean;
   certificateIssued: boolean;
   certificateUrl: string;
-
-  createdAt: string;
 }
 
 // ДОБАВЛЕНО: DTO для создания заявки
@@ -227,7 +224,6 @@ export interface ApplicationAttachment extends BaseDocument {
   fileUrl: string;
   uploadedBy: string;
   description?: string;
-  createdAt: string;
 }
 
 // Комментарий к заявке
@@ -236,8 +232,6 @@ export interface ApplicationComment extends BaseDocument {
   authorId: string;
   text: string;
   isInternal: boolean;
-  createdAt: string;
-
   // Дополнительные поля для UI
   author?: User;
   isEdited?: boolean;
@@ -252,8 +246,6 @@ export interface ApplicationHistory extends BaseDocument {
   oldValue?: string;
   newValue?: string;
   description: string;
-  createdAt: string;
-
   // Дополнительные поля для UI
   user?: User;
   actionType?: "status_change" | "assignment" | "review" | "edit" | "comment";
@@ -277,7 +269,6 @@ export interface ConferenceSchedule extends BaseDocument {
   conferenceId: string;
   date: string;
   timeSlots: TimeSlot[];
-  createdAt: string;
 }
 
 // ДОБАВЛЕНО: Конференция с дополнительными деталями для UI
@@ -437,7 +428,6 @@ export interface AdminAttentionItem {
   count: number;
   actionUrl?: string;
   relatedEntityIds?: string[];
-  createdAt: string;
   resolvedAt?: string;
   resolvedBy?: string;
 }

@@ -1,10 +1,11 @@
-// src/components/common/Navbar.tsx (Рефакторинг)
+// src/components/common/Navbar.tsx - СОЗДАТЬ ЭТОТ ФАЙЛ
 
 "use client";
 
 import React, { useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { UserRole, getRoleLabel, getRoleColor } from "@/types";
+import { UserRole } from "@/types";
+import { getRoleLabel, getRoleColor, getHomeRoute } from "@/utils/permissions";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import {
@@ -14,18 +15,17 @@ import {
   LogOut,
   Settings,
   Home,
-  ClipboardList,
+  Calendar,
+  FileText,
   Users,
-  Wrench,
   Shield,
   Bell,
   Search,
   Plus,
   BarChart3,
-  MessageSquare,
   HelpCircle,
+  Eye,
 } from "lucide-react";
-import { useDebouncedCallback } from "@/utils/performance";
 
 // Типы для навигации
 interface NavigationItem {
@@ -34,7 +34,6 @@ interface NavigationItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
   description?: string;
-  requiresPermission?: string;
 }
 
 interface NavigationGroup {
@@ -43,45 +42,21 @@ interface NavigationGroup {
 }
 
 export function Navbar() {
-  const {
-    user,
-    logout,
-    isLoggingOut,
-    canManageUsers,
-    canManageRequests,
-    canCreateRequests,
-  } = useAuth();
-
+  const { user, logout, loading } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
-  // Функция получения пути дашборда - MOVED ABOVE useMemo
-  const getDashboardPath = useCallback((role: UserRole): string => {
-    switch (role) {
-      case UserRole.SUPER_ADMIN:
-        return "/admin";
-      case UserRole.MANAGER:
-        return "/manager";
-      case UserRole.TECHNICIAN:
-        return "/technician";
-      case UserRole.REQUESTER:
-        return "/requester";
-      default:
-        return "/";
-    }
-  }, []);
-
-  // Debounced функции для оптимизации
-  const debouncedLogout = useDebouncedCallback(async () => {
+  // Функция выхода
+  const handleLogout = useCallback(async () => {
     try {
       await logout();
       router.push("/login");
     } catch (error) {
       console.error("Ошибка при выходе:", error);
     }
-  }, 300);
+  }, [logout, router]);
 
   const toggleMenu = useCallback(() => {
     setIsMenuOpen((prev) => !prev);
@@ -105,86 +80,133 @@ export function Navbar() {
     // Основные разделы
     const mainItems: NavigationItem[] = [
       {
-        href: getDashboardPath(user.role),
+        href: getHomeRoute(user.role),
         label: "Главная",
         icon: Home,
         description: "Обзор и статистика",
       },
     ];
 
-    // Заявки
-    const requestItems: NavigationItem[] = [];
+    // Конференции
+    const conferenceItems: NavigationItem[] = [];
 
-    if (canManageRequests) {
-      requestItems.push({
-        href: "/requests",
+    if (user.role === UserRole.SUPER_ADMIN) {
+      conferenceItems.push({
+        href: "/admin/conferences",
+        label: "Все конференции",
+        icon: Calendar,
+        description: "Управление всеми конференциями",
+      });
+    }
+
+    if ([UserRole.SUPER_ADMIN, UserRole.ORGANIZER].includes(user.role)) {
+      conferenceItems.push({
+        href: "/organizer/conferences",
+        label:
+          user.role === UserRole.SUPER_ADMIN
+            ? "Мои конференции"
+            : "Конференции",
+        icon: Calendar,
+        description: "Управление конференциями",
+      });
+      conferenceItems.push({
+        href: "/organizer/conferences/create",
+        label: "Создать конференцию",
+        icon: Plus,
+        description: "Добавить новую конференцию",
+      });
+    }
+
+    if (user.role === UserRole.PARTICIPANT) {
+      conferenceItems.push({
+        href: "/participant/conferences",
+        label: "Доступные конференции",
+        icon: Calendar,
+        description: "Просмотр доступных конференций",
+      });
+    }
+
+    if (conferenceItems.length > 0) {
+      groups.push({
+        title: "Конференции",
+        items: conferenceItems,
+      });
+    }
+
+    // Заявки
+    const applicationItems: NavigationItem[] = [];
+
+    if (user.role === UserRole.SUPER_ADMIN) {
+      applicationItems.push({
+        href: "/admin/applications",
         label: "Все заявки",
-        icon: ClipboardList,
+        icon: FileText,
         description: "Управление всеми заявками",
       });
     }
 
-    if (user.role === UserRole.TECHNICIAN) {
-      requestItems.push({
-        href: "/technician/assigned",
-        label: "Мои заявки",
-        icon: Wrench,
-        description: "Назначенные мне заявки",
+    if ([UserRole.SUPER_ADMIN, UserRole.ORGANIZER].includes(user.role)) {
+      applicationItems.push({
+        href: "/organizer/applications",
+        label: "Заявки конференций",
+        icon: FileText,
+        description: "Заявки на мои конференции",
       });
     }
 
-    if (user.role === UserRole.REQUESTER) {
-      requestItems.push({
-        href: "/requester/requests",
+    if ([UserRole.SUPER_ADMIN, UserRole.REVIEWER].includes(user.role)) {
+      applicationItems.push({
+        href: "/reviewer/applications",
+        label: "На рецензирование",
+        icon: Eye,
+        description: "Заявки для рецензирования",
+      });
+    }
+
+    if ([UserRole.SUPER_ADMIN, UserRole.PARTICIPANT].includes(user.role)) {
+      applicationItems.push({
+        href: "/participant/applications",
         label: "Мои заявки",
-        icon: ClipboardList,
+        icon: FileText,
         description: "Поданные мною заявки",
       });
-    }
-
-    if (canCreateRequests) {
-      requestItems.push({
-        href: "/requests/create",
-        label: "Новая заявка",
+      applicationItems.push({
+        href: "/participant/applications/create",
+        label: "Подать заявку",
         icon: Plus,
-        description: "Создать заявку на ремонт",
+        description: "Создать новую заявку",
       });
     }
 
-    if (requestItems.length > 0) {
+    if (applicationItems.length > 0) {
       groups.push({
         title: "Заявки",
-        items: requestItems,
+        items: applicationItems,
       });
     }
 
-    // Управление (только для админов и менеджеров)
-    if (canManageUsers || user.role === UserRole.SUPER_ADMIN) {
-      const managementItems: NavigationItem[] = [];
-
-      if (canManageUsers) {
-        managementItems.push({
+    // Управление (только для админов)
+    if (user.role === UserRole.SUPER_ADMIN) {
+      const managementItems: NavigationItem[] = [
+        {
           href: "/admin/users",
           label: "Пользователи",
           icon: Users,
           description: "Управление пользователями",
-        });
-      }
-
-      managementItems.push(
+        },
         {
-          href: "/analytics",
+          href: "/admin/analytics",
           label: "Аналитика",
           icon: BarChart3,
           description: "Отчеты и статистика",
         },
         {
-          href: "/settings",
+          href: "/admin/settings",
           label: "Настройки",
           icon: Settings,
           description: "Настройки системы",
-        }
-      );
+        },
+      ];
 
       groups.push({
         title: "Управление",
@@ -199,23 +221,17 @@ export function Navbar() {
     });
 
     return groups;
-  }, [
-    user,
-    canManageUsers,
-    canManageRequests,
-    canCreateRequests,
-    getDashboardPath,
-  ]);
+  }, [user]);
 
   // Проверка активного пути
   const isActivePath = useCallback(
     (href: string): boolean => {
-      if (href === getDashboardPath(user?.role || UserRole.REQUESTER)) {
+      if (href === getHomeRoute(user?.role || UserRole.PARTICIPANT)) {
         return pathname === href;
       }
       return pathname.startsWith(href);
     },
-    [pathname, user?.role, getDashboardPath]
+    [pathname, user?.role]
   );
 
   // Иконка роли
@@ -223,18 +239,19 @@ export function Navbar() {
     switch (role) {
       case UserRole.SUPER_ADMIN:
         return Shield;
-      case UserRole.MANAGER:
-        return Users;
-      case UserRole.TECHNICIAN:
-        return Wrench;
-      case UserRole.REQUESTER:
+      case UserRole.ORGANIZER:
+        return Calendar;
+      case UserRole.REVIEWER:
+        return Eye;
+      case UserRole.PARTICIPANT:
         return User;
       default:
         return User;
     }
   };
 
-  if (!user) {
+  // Не показываем Navbar если пользователь не авторизован или загружается
+  if (!user || loading) {
     return null;
   }
 
@@ -250,15 +267,15 @@ export function Navbar() {
             <div className="flex items-center">
               {/* Лого */}
               <Link
-                href={getDashboardPath(user.role)}
+                href={getHomeRoute(user.role)}
                 className="flex-shrink-0 flex items-center group"
                 onClick={closeMenus}
               >
                 <div className="h-8 w-8 bg-indigo-600 rounded-lg flex items-center justify-center group-hover:bg-indigo-700 transition-colors">
-                  <Wrench className="h-5 w-5 text-white" />
+                  <Calendar className="h-5 w-5 text-white" />
                 </div>
                 <span className="ml-2 text-xl font-bold text-gray-900 hidden sm:block">
-                  Система заявок
+                  Система конференций
                 </span>
               </Link>
 
@@ -285,15 +302,28 @@ export function Navbar() {
               {/* Уведомления */}
               <NotificationButton />
 
-              {/* Быстрые действия */}
-              {canCreateRequests && (
+              {/* Быстрые действия для создания */}
+              {user.role === UserRole.PARTICIPANT && (
                 <Link
-                  href="/requests/create"
+                  href="/participant/applications/create"
                   className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
                   onClick={closeMenus}
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Новая заявка</span>
+                  <span className="hidden sm:inline">Подать заявку</span>
+                </Link>
+              )}
+
+              {[UserRole.SUPER_ADMIN, UserRole.ORGANIZER].includes(
+                user.role
+              ) && (
+                <Link
+                  href="/organizer/conferences/create"
+                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                  onClick={closeMenus}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">Создать</span>
                 </Link>
               )}
 
@@ -303,8 +333,7 @@ export function Navbar() {
                   user={user}
                   isOpen={isProfileMenuOpen}
                   onToggle={toggleProfileMenu}
-                  onLogout={debouncedLogout}
-                  isLoggingOut={isLoggingOut}
+                  onLogout={handleLogout}
                   onClose={closeMenus}
                 />
               </div>
@@ -334,8 +363,7 @@ export function Navbar() {
         navigationGroups={navigationGroups}
         user={user}
         isActivePath={isActivePath}
-        onLogout={debouncedLogout}
-        isLoggingOut={isLoggingOut}
+        onLogout={handleLogout}
         onClose={closeMenus}
       />
 
@@ -397,7 +425,6 @@ interface MobileMenuProps {
   user: any;
   isActivePath: (href: string) => boolean;
   onLogout: () => void;
-  isLoggingOut: boolean;
   onClose: () => void;
 }
 
@@ -407,7 +434,6 @@ function MobileMenu({
   user,
   isActivePath,
   onLogout,
-  isLoggingOut,
   onClose,
 }: MobileMenuProps) {
   if (!isOpen) return null;
@@ -415,10 +441,10 @@ function MobileMenu({
   const RoleIcon =
     user.role === UserRole.SUPER_ADMIN
       ? Shield
-      : user.role === UserRole.MANAGER
-      ? Users
-      : user.role === UserRole.TECHNICIAN
-      ? Wrench
+      : user.role === UserRole.ORGANIZER
+      ? Calendar
+      : user.role === UserRole.REVIEWER
+      ? Eye
       : User;
 
   return (
@@ -496,14 +522,9 @@ function MobileMenu({
 
             <button
               onClick={onLogout}
-              disabled={isLoggingOut}
-              className="flex items-center w-full px-3 py-2 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
+              className="flex items-center w-full px-3 py-2 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
             >
-              {isLoggingOut ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600 mr-3"></div>
-              ) : (
-                <LogOut className="h-5 w-5 mr-3" />
-              )}
+              <LogOut className="h-5 w-5 mr-3" />
               Выйти
             </button>
           </div>
@@ -519,7 +540,6 @@ interface UserProfileDropdownProps {
   isOpen: boolean;
   onToggle: () => void;
   onLogout: () => void;
-  isLoggingOut: boolean;
   onClose: () => void;
 }
 
@@ -528,16 +548,15 @@ function UserProfileDropdown({
   isOpen,
   onToggle,
   onLogout,
-  isLoggingOut,
   onClose,
 }: UserProfileDropdownProps) {
   const RoleIcon =
     user.role === UserRole.SUPER_ADMIN
       ? Shield
-      : user.role === UserRole.MANAGER
-      ? Users
-      : user.role === UserRole.TECHNICIAN
-      ? Wrench
+      : user.role === UserRole.ORGANIZER
+      ? Calendar
+      : user.role === UserRole.REVIEWER
+      ? Eye
       : User;
 
   return (
@@ -593,14 +612,9 @@ function UserProfileDropdown({
             <div className="border-t border-gray-100">
               <button
                 onClick={onLogout}
-                disabled={isLoggingOut}
-                className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+                className="flex items-center w-full px-4 py-2 text-sm text-red-700 hover:bg-red-50 transition-colors"
               >
-                {isLoggingOut ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-3"></div>
-                ) : (
-                  <LogOut className="h-4 w-4 mr-3" />
-                )}
+                <LogOut className="h-4 w-4 mr-3" />
                 Выйти
               </button>
             </div>
@@ -616,7 +630,6 @@ function SearchButton() {
   return (
     <button
       onClick={() => {
-        // TODO: Открыть модальное окно поиска
         console.log("Открыть поиск");
       }}
       className="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-md transition-colors"
@@ -629,12 +642,11 @@ function SearchButton() {
 
 // Компонент кнопки уведомлений
 function NotificationButton() {
-  const [hasUnread] = useState(false); // TODO: Подключить к реальным данным
+  const [hasUnread] = useState(false);
 
   return (
     <button
       onClick={() => {
-        // TODO: Открыть панель уведомлений
         console.log("Открыть уведомления");
       }}
       className="relative p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-md transition-colors"
