@@ -1,139 +1,71 @@
-// src/hooks/useAuth.ts - ПОЛНОСТЬЮ ЗАМЕНИТЬ ФАЙЛ
+// src/hooks/useAuth.ts - ИСПРАВЛЕННАЯ ВЕРСИЯ
 
-import { useAuthStore } from "@/store/authStore";
-import {
-  useCurrentUser,
-  useLogin,
-  useLogout,
-  useRegister,
-} from "@/services/authService";
-import { useEffect, useCallback, useMemo } from "react";
-import { UserRole, User } from "@/types";
+import { useState, useEffect, useCallback } from "react";
+import { appwriteService } from "@/services/appwriteService";
+import { User, UserRole } from "@/types";
+import { toast } from "react-toastify";
 
-interface AuthHookReturn {
+interface AuthState {
   user: User | null;
   loading: boolean;
   error: string | null;
-  isAuthenticated: boolean;
-  isActive: boolean;
-  login: (email: string, password: string) => Promise<User>;
-  logout: () => Promise<void>;
-  register: (
-    name: string,
-    email: string,
-    password: string,
-    role: UserRole,
-    organization?: string,
-    phone?: string
-  ) => Promise<{ user: User; isFirstUser: boolean }>;
-  clearError: () => void;
-  isLoggingIn: boolean;
-  isLoggingOut: boolean;
-  isRegistering: boolean;
-  isCheckingAuth: boolean;
-  isSuper: boolean;
-  isOrganizer: boolean;
-  isReviewer: boolean;
-  isParticipant: boolean;
-  canManageUsers: boolean;
-  canManageConferences: boolean;
-  canReviewApplications: boolean;
-  canViewAllApplications: boolean;
-  canSubmitApplications: boolean;
 }
 
-const isValidUser = (user: any): user is User => {
-  return (
-    user !== null &&
-    user !== undefined &&
-    typeof user === "object" &&
-    user.$id &&
-    user.email &&
-    user.role
-  );
-};
+export function useAuth() {
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    loading: true,
+    error: null,
+  });
 
-export function useAuth(): AuthHookReturn {
-  const { user, setUser, clearUser } = useAuthStore();
+  const clearError = useCallback(() => {
+    setState((prev) => ({ ...prev, error: null }));
+  }, []);
 
-  const {
-    data: currentUser,
-    isLoading: isCheckingAuth,
-    error: authError,
-  } = useCurrentUser();
+  const setError = useCallback((error: string) => {
+    setState((prev) => ({ ...prev, error, loading: false }));
+  }, []);
 
-  const loginMutation = useLogin();
-  const logoutMutation = useLogout();
-  const registerMutation = useRegister();
+  const setUser = useCallback((user: User | null) => {
+    setState((prev) => ({ ...prev, user, loading: false, error: null }));
+  }, []);
 
-  // Синхронизация с React Query
+  const setLoading = useCallback((loading: boolean) => {
+    setState((prev) => ({ ...prev, loading }));
+  }, []);
+
+  // Проверка текущей сессии при загрузке
   useEffect(() => {
-    if (isValidUser(currentUser)) {
-      if (JSON.stringify(currentUser) !== JSON.stringify(user)) {
-        setUser(currentUser);
-      }
-    } else if (currentUser === null && user !== null) {
-      clearUser();
-    }
-  }, [currentUser, setUser, clearUser, user]);
-
-  // Проверяем права доступа на основе роли
-  const permissions = useMemo(() => {
-    if (!user || !user.isActive) {
-      return {
-        canManageUsers: false,
-        canManageConferences: false,
-        canReviewApplications: false,
-        canViewAllApplications: false,
-        canSubmitApplications: false,
-      };
-    }
-
-    const isSuper = user.role === UserRole.SUPER_ADMIN;
-    const isOrganizer = user.role === UserRole.ORGANIZER;
-    const isReviewer = user.role === UserRole.REVIEWER;
-    const isParticipant = user.role === UserRole.PARTICIPANT;
-
-    return {
-      canManageUsers: isSuper,
-      canManageConferences: isSuper || isOrganizer,
-      canReviewApplications: isSuper || isOrganizer || isReviewer,
-      canViewAllApplications: isSuper || isOrganizer,
-      canSubmitApplications: isSuper || isOrganizer || isParticipant,
-    };
-  }, [user]);
-
-  const login = useCallback(
-    async (email: string, password: string): Promise<User> => {
+    const checkCurrentUser = async () => {
       try {
-        const user = await loginMutation.mutateAsync({ email, password });
-        setUser(user);
-        return user;
-      } catch (error: any) {
-        clearUser();
-        throw error;
-      }
-    },
-    [loginMutation, setUser, clearUser]
-  );
+        setLoading(true);
+        const currentUser = await appwriteService.getCurrentUser();
 
-  const logout = useCallback(async (): Promise<void> => {
-    try {
-      await logoutMutation.mutateAsync();
-      clearUser();
-
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("auth-storage");
+        if (currentUser) {
+          // Получаем полную информацию о пользователе из базы данных
+          const userDoc = await appwriteService.getUserById(currentUser.$id);
+          if (userDoc) {
+            setUser(userDoc);
+          } else {
+            // Пользователь есть в системе аутентификации, но нет в базе данных
+            await appwriteService.logout();
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Ошибка при проверке пользователя:", error);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      clearUser();
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("auth-storage");
-      }
-      throw error;
-    }
-  }, [logoutMutation, clearUser]);
+    };
 
+    checkCurrentUser();
+  }, []);
+
+  // ИСПРАВЛЕННАЯ функция регистрации
   const register = useCallback(
     async (
       name: string,
@@ -142,75 +74,167 @@ export function useAuth(): AuthHookReturn {
       role: UserRole,
       organization?: string,
       phone?: string
-    ): Promise<{ user: User; isFirstUser: boolean }> => {
+    ) => {
       try {
-        const result = await registerMutation.mutateAsync({
+        setLoading(true);
+        clearError();
+
+        // Создаем аккаунт в Appwrite Auth
+        const authUser = await appwriteService.createAccount(
           name,
           email,
-          password,
-          role,
-          organization,
-          phone,
-        });
+          password
+        );
 
-        if (result.isFirstUser) {
-          setUser(result.user);
+        if (!authUser) {
+          throw new Error("Не удалось создать аккаунт");
         }
 
-        return result;
+        // ИСПРАВЛЕНИЕ: Добавляем поле createdAt при создании документа пользователя
+        const userData: Omit<User, "$id" | "$createdAt" | "$updatedAt"> = {
+          name,
+          email,
+          role,
+          isActive: role === UserRole.SUPER_ADMIN, // Супер-админ активируется автоматически
+          organization: organization || "",
+          position: "",
+          bio: "",
+          phone: phone || "",
+          orcid: "",
+          website: "",
+          createdAt: new Date().toISOString(), // ИСПРАВЛЕНИЕ: Явно указываем createdAt
+        };
+
+        // Создаем документ пользователя в базе данных
+        const userDoc = await appwriteService.createUserDocument(
+          authUser.$id,
+          userData
+        );
+
+        // Выход из системы для обычных пользователей (они должны быть активированы)
+        if (role !== UserRole.SUPER_ADMIN) {
+          await appwriteService.logout();
+        }
+
+        return userDoc;
       } catch (error: any) {
-        throw error;
+        const message = error?.message || "Ошибка при регистрации";
+        setError(message);
+        throw new Error(message);
+      } finally {
+        setLoading(false);
       }
     },
-    [registerMutation, setUser]
+    [clearError, setLoading, setError]
   );
 
-  const clearError = useCallback(() => {
-    loginMutation.reset();
-    logoutMutation.reset();
-    registerMutation.reset();
-  }, [loginMutation, logoutMutation, registerMutation]);
+  // ИСПРАВЛЕННАЯ функция входа
+  const login = useCallback(
+    async (email: string, password: string) => {
+      try {
+        setLoading(true);
+        clearError();
 
-  // Вычисляемые свойства
-  const isAuthenticated = !!user && isValidUser(user);
-  const isActive = user?.isActive === true;
-  const loading =
-    isCheckingAuth ||
-    loginMutation.isPending ||
-    logoutMutation.isPending ||
-    registerMutation.isPending;
+        // Авторизация в Appwrite
+        const session = await appwriteService.createSession(email, password);
 
-  const error =
-    authError?.message ||
-    loginMutation.error?.message ||
-    logoutMutation.error?.message ||
-    registerMutation.error?.message ||
-    null;
+        if (!session) {
+          throw new Error("Неверный email или пароль");
+        }
 
-  // Проверки ролей
-  const isSuper = user?.role === UserRole.SUPER_ADMIN;
-  const isOrganizer = user?.role === UserRole.ORGANIZER;
-  const isReviewer = user?.role === UserRole.REVIEWER;
-  const isParticipant = user?.role === UserRole.PARTICIPANT;
+        // Получаем текущего пользователя
+        const authUser = await appwriteService.getCurrentUser();
+
+        if (!authUser) {
+          throw new Error("Не удалось получить данные пользователя");
+        }
+
+        // Получаем документ пользователя из базы данных
+        const userDoc = await appwriteService.getUserById(authUser.$id);
+
+        if (!userDoc) {
+          await appwriteService.logout();
+          throw new Error("Профиль пользователя не найден");
+        }
+
+        // Проверяем, активирован ли аккаунт
+        if (!userDoc.isActive) {
+          await appwriteService.logout();
+          throw new Error("Аккаунт не активирован администратором");
+        }
+
+        setUser(userDoc);
+        return userDoc;
+      } catch (error: any) {
+        const message = error?.message || "Ошибка при входе";
+        setError(message);
+        throw new Error(message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [clearError, setLoading, setError, setUser]
+  );
+
+  // Функция выхода
+  const logout = useCallback(async () => {
+    try {
+      setLoading(true);
+      await appwriteService.logout();
+      setUser(null);
+      toast.success("Вы успешно вышли из системы");
+    } catch (error: any) {
+      console.error("Ошибка при выходе:", error);
+      // Даже если есть ошибка, очищаем локальное состояние
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setUser]);
+
+  // Функция обновления профиля
+  const updateProfile = useCallback(
+    async (updates: Partial<User>) => {
+      if (!state.user) {
+        throw new Error("Пользователь не авторизован");
+      }
+
+      try {
+        setLoading(true);
+
+        const updatedUser = await appwriteService.updateUserDocument(
+          state.user.$id,
+          updates
+        );
+
+        if (updatedUser) {
+          setUser(updatedUser);
+          toast.success("Профиль успешно обновлен");
+          return updatedUser;
+        } else {
+          throw new Error("Не удалось обновить профиль");
+        }
+      } catch (error: any) {
+        const message = error?.message || "Ошибка при обновлении профиля";
+        setError(message);
+        throw new Error(message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [state.user, setLoading, setUser, setError]
+  );
 
   return {
-    user,
-    loading,
-    error,
-    isAuthenticated,
-    isActive,
+    user: state.user,
+    loading: state.loading,
+    error: state.error,
+    register,
     login,
     logout,
-    register,
+    updateProfile,
     clearError,
-    isLoggingIn: loginMutation.isPending,
-    isLoggingOut: logoutMutation.isPending,
-    isRegistering: registerMutation.isPending,
-    isCheckingAuth,
-    isSuper,
-    isOrganizer,
-    isReviewer,
-    isParticipant,
-    ...permissions,
+    isAuthenticated: !!state.user,
+    isLoading: state.loading,
   };
 }

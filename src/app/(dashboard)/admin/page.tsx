@@ -8,7 +8,11 @@ import { ConferencesList } from "@/components/conferences/ConferencesList";
 import { ApplicationsList } from "@/components/applications/ApplicationsList";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { ApplicationReviewModal } from "@/components/applications/ApplicationReviewModal";
-import { Conference, ConferenceApplication, ApplicationWithDetails } from "@/types";
+import {
+  Conference,
+  ConferenceApplication,
+  ApplicationWithDetails,
+} from "@/types";
 import {
   BarChart3,
   Calendar,
@@ -28,6 +32,7 @@ import {
   Mail,
   Activity,
 } from "lucide-react";
+import { SystemAnalytics } from "@/components/analytics/SystemAnalytics";
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -39,7 +44,7 @@ export default function AdminPage() {
     | "analytics"
     | "settings"
   >("dashboard");
-  
+
   const [selectedApplication, setSelectedApplication] = useState<
     ApplicationWithDetails | ConferenceApplication | null
   >(null);
@@ -90,7 +95,8 @@ export default function AdminPage() {
                 Панель супер администратора
               </h1>
               <p className="text-sm text-gray-600 mt-1">
-                Добро пожаловать, {user.name}! Полный контроль над системой конференций
+                Добро пожаловать, {user.name}! Полный контроль над системой
+                конференций
               </p>
             </div>
             <div className="flex items-center space-x-3">
@@ -290,35 +296,51 @@ function QuickSystemStats() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
       <div className="text-center">
-        <div className="text-2xl font-bold text-gray-900">{stats.totalUsers}</div>
+        <div className="text-2xl font-bold text-gray-900">
+          {stats.totalUsers}
+        </div>
         <div className="text-sm text-gray-600">Всего пользователей</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-green-600">{stats.activeUsers}</div>
+        <div className="text-2xl font-bold text-green-600">
+          {stats.activeUsers}
+        </div>
         <div className="text-sm text-gray-600">Активные</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-blue-600">{stats.totalConferences}</div>
+        <div className="text-2xl font-bold text-blue-600">
+          {stats.totalConferences}
+        </div>
         <div className="text-sm text-gray-600">Конференции</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-purple-600">{stats.activeConferences}</div>
+        <div className="text-2xl font-bold text-purple-600">
+          {stats.activeConferences}
+        </div>
         <div className="text-sm text-gray-600">Активные</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-indigo-600">{stats.totalApplications}</div>
+        <div className="text-2xl font-bold text-indigo-600">
+          {stats.totalApplications}
+        </div>
         <div className="text-sm text-gray-600">Всего заявок</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-yellow-600">{stats.pendingReview}</div>
+        <div className="text-2xl font-bold text-yellow-600">
+          {stats.pendingReview}
+        </div>
         <div className="text-sm text-gray-600">На рассмотрении</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-green-600">{stats.systemHealth}%</div>
+        <div className="text-2xl font-bold text-green-600">
+          {stats.systemHealth}%
+        </div>
         <div className="text-sm text-gray-600">Здоровье системы</div>
       </div>
       <div className="text-center">
-        <div className="text-2xl font-bold text-orange-600">{stats.storageUsed}%</div>
+        <div className="text-2xl font-bold text-orange-600">
+          {stats.storageUsed}%
+        </div>
         <div className="text-sm text-gray-600">Использ. места</div>
       </div>
     </div>
@@ -398,7 +420,9 @@ function SystemActivity() {
                     {new Date(activity.timestamp).toLocaleString("ru-RU")}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600">Пользователь: {activity.user}</p>
+                <p className="text-sm text-gray-600">
+                  Пользователь: {activity.user}
+                </p>
               </div>
             </div>
           ))}
@@ -841,18 +865,4 @@ function SystemSettings() {
       </div>
     </div>
   );
-}600">
-        Компонент управления пользователями будет реализован в следующей версии
-      </p>
-    </div>
-  );
 }
-
-function SystemAnalytics() {
-  return (
-    <div className="text-center py-12">
-      <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-      <h3 className="text-lg font-medium text-gray-900 mb-2">
-        Расширенная аналитика
-      </h3>
-      <p className="text-gray-

@@ -1,55 +1,12 @@
-// src/types/index.ts
+// src/types/index.ts - ПОЛНАЯ ВЕРСИЯ
 
+// Роли пользователей
 export enum UserRole {
   SUPER_ADMIN = "SUPER_ADMIN",
   ORGANIZER = "ORGANIZER",
   REVIEWER = "REVIEWER",
   PARTICIPANT = "PARTICIPANT",
 }
-
-export const UserRoleLabels: Record<UserRole, string> = {
-  [UserRole.SUPER_ADMIN]: "Супер админ",
-  [UserRole.ORGANIZER]: "Организатор",
-  [UserRole.REVIEWER]: "Рецензент",
-  [UserRole.PARTICIPANT]: "Участник",
-};
-
-export const UserRoleColors: Record<UserRole, string> = {
-  [UserRole.SUPER_ADMIN]: "bg-red-100 text-red-800",
-  [UserRole.ORGANIZER]: "bg-blue-100 text-blue-800",
-  [UserRole.REVIEWER]: "bg-green-100 text-green-800",
-  [UserRole.PARTICIPANT]: "bg-purple-100 text-purple-800",
-};
-
-// Статусы заявок
-export enum ApplicationStatus {
-  DRAFT = "DRAFT",
-  SUBMITTED = "SUBMITTED",
-  UNDER_REVIEW = "UNDER_REVIEW",
-  ACCEPTED = "ACCEPTED",
-  REJECTED = "REJECTED",
-  WAITLIST = "WAITLIST",
-}
-
-export const ApplicationStatusLabels: Record<ApplicationStatus, string> = {
-  [ApplicationStatus.DRAFT]: "Черновик",
-  [ApplicationStatus.SUBMITTED]: "Подана",
-  [ApplicationStatus.UNDER_REVIEW]: "На рассмотрении",
-  [ApplicationStatus.ACCEPTED]: "Принята",
-  [ApplicationStatus.REJECTED]: "Отклонена",
-  [ApplicationStatus.WAITLIST]: "В листе ожидания",
-};
-
-export const ApplicationStatusColors: Record<ApplicationStatus, string> = {
-  [ApplicationStatus.DRAFT]: "bg-gray-100 text-gray-800 border-gray-200",
-  [ApplicationStatus.SUBMITTED]:
-    "bg-yellow-100 text-yellow-800 border-yellow-200",
-  [ApplicationStatus.UNDER_REVIEW]: "bg-blue-100 text-blue-800 border-blue-200",
-  [ApplicationStatus.ACCEPTED]: "bg-green-100 text-green-800 border-green-200",
-  [ApplicationStatus.REJECTED]: "bg-red-100 text-red-800 border-red-200",
-  [ApplicationStatus.WAITLIST]:
-    "bg-orange-100 text-orange-800 border-orange-200",
-};
 
 // Тематики конференций
 export enum ConferenceTheme {
@@ -64,32 +21,24 @@ export enum ConferenceTheme {
   OTHER = "OTHER",
 }
 
-export const ConferenceThemeLabels: Record<ConferenceTheme, string> = {
-  [ConferenceTheme.COMPUTER_SCIENCE]: "Компьютерные науки",
-  [ConferenceTheme.MEDICINE]: "Медицина",
-  [ConferenceTheme.EDUCATION]: "Образование",
-  [ConferenceTheme.ENGINEERING]: "Инженерия",
-  [ConferenceTheme.BUSINESS]: "Бизнес и экономика",
-  [ConferenceTheme.SOCIAL_SCIENCES]: "Социальные науки",
-  [ConferenceTheme.NATURAL_SCIENCES]: "Естественные науки",
-  [ConferenceTheme.HUMANITIES]: "Гуманитарные науки",
-  [ConferenceTheme.OTHER]: "Другое",
-};
-
-// Формат участия
+// Типы участия в конференции
 export enum ParticipationType {
   ONLINE = "ONLINE",
   OFFLINE = "OFFLINE",
   HYBRID = "HYBRID",
 }
 
-export const ParticipationTypeLabels: Record<ParticipationType, string> = {
-  [ParticipationType.ONLINE]: "Онлайн",
-  [ParticipationType.OFFLINE]: "Очно",
-  [ParticipationType.HYBRID]: "Гибридный",
-};
+// Статусы заявок
+export enum ApplicationStatus {
+  DRAFT = "DRAFT",
+  SUBMITTED = "SUBMITTED",
+  UNDER_REVIEW = "UNDER_REVIEW",
+  ACCEPTED = "ACCEPTED",
+  REJECTED = "REJECTED",
+  WAITLIST = "WAITLIST",
+}
 
-// Тип презентации
+// Типы презентаций
 export enum PresentationType {
   ORAL = "ORAL",
   POSTER = "POSTER",
@@ -98,22 +47,11 @@ export enum PresentationType {
   PANEL = "PANEL",
 }
 
-export const PresentationTypeLabels: Record<PresentationType, string> = {
-  [PresentationType.ORAL]: "Устный доклад",
-  [PresentationType.POSTER]: "Постер",
-  [PresentationType.WORKSHOP]: "Мастер-класс",
-  [PresentationType.KEYNOTE]: "Ключевой доклад",
-  [PresentationType.PANEL]: "Панельная дискуссия",
-};
-
-// Базовый интерфейс документа
+// Базовый интерфейс для документов Appwrite
 export interface BaseDocument {
   $id: string;
   $createdAt: string;
   $updatedAt: string;
-  $permissions: string[];
-  $databaseId: string;
-  $collectionId: string;
 }
 
 // Пользователь
@@ -122,12 +60,13 @@ export interface User extends BaseDocument {
   email: string;
   role: UserRole;
   isActive: boolean;
-  organization?: string;
-  position?: string;
-  bio?: string;
-  phone?: string;
-  orcid?: string; // ORCID ID для исследователей
-  website?: string;
+  organization: string;
+  position: string;
+  bio: string;
+  phone: string;
+  orcid: string;
+  website: string;
+  createdAt: string;
 }
 
 // Конференция
@@ -138,20 +77,21 @@ export interface Conference extends BaseDocument {
   startDate: string;
   endDate: string;
   submissionDeadline: string;
-  location: string; // адрес или "онлайн"
+  location: string;
   participationType: ParticipationType;
   organizerId: string;
   contactEmail: string;
-  website?: string;
+  website: string;
   maxParticipants?: number;
-  registrationFee?: number;
+  registrationFee: number;
   isPublished: boolean;
-  requirements?: string; // требования к докладам
-  tags?: string[]; // теги для поиска
+  requirements: string;
+  tags: string[];
+  createdAt: string;
 }
 
 // Заявка на участие
-export interface ConferenceApplication extends BaseDocument {
+export interface Application extends BaseDocument {
   conferenceId: string;
   participantId: string;
   status: ApplicationStatus;
@@ -159,39 +99,81 @@ export interface ConferenceApplication extends BaseDocument {
   // Информация об участнике
   fullName: string;
   organization: string;
-  position?: string;
+  position: string;
   email: string;
-  phone?: string;
+  phone: string;
 
   // Информация о докладе
   hasPresentation: boolean;
   presentationType?: PresentationType;
-  presentationTitle?: string;
-  abstract?: string;
-  keywords?: string[];
+  presentationTitle: string;
+  abstract: string;
+  keywords: string[];
 
   // Дополнительная информация
-  dietaryRestrictions?: string;
-  accessibilityNeeds?: string;
-  accommodationNeeded?: boolean;
+  dietaryRestrictions: string;
+  accessibilityNeeds: string;
+  accommodationNeeded: boolean;
 
   // Рецензирование
   assignedReviewerId?: string;
-  reviewerComments?: string;
+  reviewerComments: string;
   reviewDate?: string;
 
   // Сертификаты и участие
-  attended?: boolean;
-  certificateIssued?: boolean;
-  certificateUrl?: string;
+  attended: boolean;
+  certificateIssued: boolean;
+  certificateUrl: string;
+
+  createdAt: string;
 }
 
-// Комментарии к заявке
+// ДОБАВЛЕНО: Алиас для обратной совместимости
+export type ConferenceApplication = Application;
+
+// ДОБАВЛЕНО: Заявка с дополнительными деталями для UI
+export interface ApplicationWithDetails extends Application {
+  conference?: Conference;
+  participant?: User;
+  reviewer?: User;
+  organizer?: User;
+
+  // Вычисляемые поля
+  daysUntilDeadline?: number;
+  isOverdue?: boolean;
+  reviewProgress?: number;
+
+  // Дополнительные метаданные
+  lastActivity?: string;
+  attachments?: ApplicationAttachment[];
+  comments?: ApplicationComment[];
+  history?: ApplicationHistory[];
+}
+
+// ДОБАВЛЕНО: Вложения к заявке
+export interface ApplicationAttachment extends BaseDocument {
+  applicationId: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  fileUrl: string;
+  uploadedBy: string;
+  description?: string;
+  createdAt: string;
+}
+
+// Комментарий к заявке
 export interface ApplicationComment extends BaseDocument {
   applicationId: string;
   authorId: string;
   text: string;
-  isInternal: boolean; // Видно только организаторам/рецензентам
+  isInternal: boolean;
+  createdAt: string;
+
+  // Дополнительные поля для UI
+  author?: User;
+  isEdited?: boolean;
+  editedAt?: string;
 }
 
 // История изменений заявки
@@ -202,15 +184,14 @@ export interface ApplicationHistory extends BaseDocument {
   oldValue?: string;
   newValue?: string;
   description: string;
+  createdAt: string;
+
+  // Дополнительные поля для UI
+  user?: User;
+  actionType?: "status_change" | "assignment" | "review" | "edit" | "comment";
 }
 
-// Расписание конференции
-export interface ConferenceSchedule extends BaseDocument {
-  conferenceId: string;
-  date: string;
-  timeSlots: TimeSlot[];
-}
-
+// Временной слот в расписании
 export interface TimeSlot {
   id: string;
   startTime: string;
@@ -218,187 +199,459 @@ export interface TimeSlot {
   title: string;
   description?: string;
   speaker?: string;
-  applicationId?: string; // связь с заявкой участника
-  location?: string; // зал/аудитория
-  type: "presentation" | "break" | "lunch" | "opening" | "closing";
+  location?: string;
+  applicationId?: string;
+  type?: "presentation" | "break" | "keynote" | "workshop" | "networking";
 }
 
-// DTO для создания заявки
-export interface CreateApplicationDto {
+// Расписание конференции
+export interface ConferenceSchedule extends BaseDocument {
   conferenceId: string;
-  fullName: string;
-  organization: string;
-  position?: string;
-  email: string;
-  phone?: string;
-  hasPresentation: boolean;
-  presentationType?: PresentationType;
-  presentationTitle?: string;
-  abstract?: string;
-  keywords?: string[];
-  dietaryRestrictions?: string;
-  accessibilityNeeds?: string;
-  accommodationNeeded?: boolean;
+  date: string;
+  timeSlots: TimeSlot[];
+  createdAt: string;
 }
 
-// DTO для обновления заявки
-export interface UpdateApplicationDto {
-  fullName?: string;
-  organization?: string;
-  position?: string;
-  email?: string;
-  phone?: string;
-  hasPresentation?: boolean;
-  presentationType?: PresentationType;
-  presentationTitle?: string;
-  abstract?: string;
-  keywords?: string[];
-  dietaryRestrictions?: string;
-  accessibilityNeeds?: string;
-  accommodationNeeded?: boolean;
-  status?: ApplicationStatus;
-  assignedReviewerId?: string;
-  reviewerComments?: string;
-  attended?: boolean;
+// ДОБАВЛЕНО: Конференция с дополнительными деталями для UI
+export interface ConferenceWithDetails extends Conference {
+  organizer?: User;
+  applicationsCount?: number;
+  acceptedApplicationsCount?: number;
+  pendingApplicationsCount?: number;
+
+  // Вычисляемые поля
+  daysUntilStart?: number;
+  daysUntilDeadline?: number;
+  isRegistrationOpen?: boolean;
+  isRegistrationClosed?: boolean;
+
+  // Статистика
+  totalApplications?: number;
+  avgRating?: number;
+  completionRate?: number;
 }
 
-// DTO для создания конференции
-export interface CreateConferenceDto {
-  title: string;
-  description: string;
-  theme: ConferenceTheme;
-  startDate: string;
-  endDate: string;
-  submissionDeadline: string;
-  location: string;
-  participationType: ParticipationType;
-  contactEmail: string;
-  website?: string;
-  maxParticipants?: number;
-  registrationFee?: number;
-  requirements?: string;
+// ДОБАВЛЕНО: Пользователь с дополнительными деталями для UI
+export interface UserWithDetails extends User {
+  // Статистика для участников
+  applicationsCount?: number;
+  acceptedApplicationsCount?: number;
+  attendedConferencesCount?: number;
+
+  // Статистика для организаторов
+  organizedConferencesCount?: number;
+  managedApplicationsCount?: number;
+
+  // Статистика для рецензентов
+  reviewedApplicationsCount?: number;
+  averageReviewTime?: number;
+
+  // Вычисляемые поля
+  lastActivityDate?: string;
+  accountAge?: number;
+  isOnline?: boolean;
+}
+
+// Фильтры для поиска
+export interface ConferenceFilters {
+  theme?: ConferenceTheme;
+  participationType?: ParticipationType;
+  dateFrom?: string;
+  dateTo?: string;
+  searchQuery?: string;
+  organizerId?: string;
+  isPublished?: boolean;
+  registrationStatus?: "open" | "closed" | "upcoming";
   tags?: string[];
 }
 
-// Расширенная информация о заявке
-export interface ApplicationWithDetails extends ConferenceApplication {
-  participant: User;
-  conference: Conference;
-  assignedReviewer?: User;
-  comments?: ApplicationComment[];
-  history?: ApplicationHistory[];
+export interface ApplicationFilters {
+  conferenceId?: string;
+  participantId?: string;
+  status?: ApplicationStatus;
+  hasPresentation?: boolean;
+  presentationType?: PresentationType;
+  assignedReviewerId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  searchQuery?: string;
+  isOverdue?: boolean;
+  needsReview?: boolean;
 }
 
-// Расширенная информация о конференции
-export interface ConferenceWithDetails extends Conference {
-  organizer: User;
-  applications?: ConferenceApplication[];
-  schedule?: ConferenceSchedule[];
-  stats?: {
-    totalApplications: number;
-    acceptedApplications: number;
-    pendingApplications: number;
-    rejectedApplications: number;
-  };
+export interface UserFilters {
+  role?: UserRole;
+  isActive?: boolean;
+  organization?: string;
+  searchQuery?: string;
+  registrationDateFrom?: string;
+  registrationDateTo?: string;
+  lastActivityFrom?: string;
+  lastActivityTo?: string;
 }
 
-// Статистика для дашборда
+// ДОБАВЛЕНО: Статистика панели администратора
 export interface DashboardStats {
+  totalUsers: number;
+  activeUsers: number;
   totalConferences: number;
-  activeConferences: number;
+  publishedConferences: number;
   totalApplications: number;
   pendingApplications: number;
   acceptedApplications: number;
   rejectedApplications: number;
-  upcomingConferences: number;
-  applicationsByTheme: Record<ConferenceTheme, number>;
-  applicationsByStatus: Record<ApplicationStatus, number>;
-  monthlyStats: {
-    month: string;
+
+  // Дополнительная статистика
+  newUsersThisMonth: number;
+  newConferencesThisMonth: number;
+  newApplicationsThisMonth: number;
+  systemHealth: number;
+  storageUsed: number;
+
+  // Тренды
+  userGrowthRate?: number;
+  applicationGrowthRate?: number;
+  conferenceGrowthRate?: number;
+}
+
+// ДОБАВЛЕНО: Элементы системной активности
+export interface SystemActivity {
+  id: string;
+  type:
+    | "conference_created"
+    | "application_submitted"
+    | "user_registered"
+    | "user_activated"
+    | "application_reviewed"
+    | "conference_published"
+    | "system_updated"
+    | "security_event";
+  description: string;
+  userId?: string;
+  user?: User;
+  relatedEntityId?: string;
+  relatedEntityType?: "conference" | "application" | "user";
+  metadata?: Record<string, any>;
+  timestamp: string;
+  severity?: "low" | "medium" | "high" | "critical";
+}
+
+// ДОБАВЛЕНО: Элементы, требующие внимания администратора
+export interface AdminAttentionItem {
+  id: string;
+  type:
+    | "pending_users"
+    | "review_delays"
+    | "storage_warning"
+    | "system_updates"
+    | "security_alerts"
+    | "conference_conflicts";
+  title: string;
+  description: string;
+  urgency: "low" | "medium" | "high" | "critical";
+  action: string;
+  count: number;
+  actionUrl?: string;
+  relatedEntityIds?: string[];
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+}
+
+// Ответы API
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+}
+
+export interface PaginatedResponse<T> {
+  documents: T[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+// Настройки уведомлений
+export interface NotificationSettings {
+  emailNotifications: boolean;
+  applicationUpdates: boolean;
+  conferenceReminders: boolean;
+  systemMessages: boolean;
+  digestFrequency: "daily" | "weekly" | "monthly" | "never";
+  notificationTypes: {
+    newApplications: boolean;
+    statusChanges: boolean;
+    deadlineReminders: boolean;
+    systemAlerts: boolean;
+  };
+}
+
+// Экспорт данных
+export interface ExportOptions {
+  format: "csv" | "xlsx" | "json" | "pdf";
+  fields: string[];
+  filters?: any;
+  dateRange?: {
+    from: string;
+    to: string;
+  };
+  includeMetadata?: boolean;
+  includeAttachments?: boolean;
+}
+
+// ДОБАВЛЕНО: Настройки системы
+export interface SystemSettings {
+  general: {
+    systemName: string;
+    adminEmail: string;
+    timezone: string;
+    language: string;
+    supportEmail?: string;
+    helpUrl?: string;
+  };
+  registration: {
+    autoActivateUsers: boolean;
+    requireEmailVerification: boolean;
+    openRegistration: boolean;
+    allowedDomains?: string[];
+    defaultRole: UserRole;
+  };
+  notifications: {
+    emailEnabled: boolean;
+    smsEnabled: boolean;
+    pushEnabled: boolean;
+    digestEnabled: boolean;
+    templates: Record<string, string>;
+  };
+  security: {
+    sessionTimeout: number; // в минутах
+    maxLoginAttempts: number;
+    minPasswordLength: number;
+    lockoutDuration: number; // в минутах
+    requireTwoFactor: boolean;
+    allowedFileTypes: string[];
+    maxFileSize: number; // в МБ
+  };
+  features: {
+    enableReviews: boolean;
+    enableCertificates: boolean;
+    enablePayments: boolean;
+    enableAnalytics: boolean;
+    enableExports: boolean;
+  };
+}
+
+// ДОБАВЛЕНО: Аналитические данные
+export interface AnalyticsData {
+  overview: {
+    totalUsers: number;
+    totalConferences: number;
+    totalApplications: number;
+    totalRevenue?: number;
+  };
+  trends: {
+    userRegistrations: TimeSeriesData[];
+    applicationSubmissions: TimeSeriesData[];
+    conferenceCreations: TimeSeriesData[];
+  };
+  demographics: {
+    usersByRole: RoleDistribution[];
+    usersByOrganization: OrganizationDistribution[];
+    conferencesByTheme: ThemeDistribution[];
+  };
+  performance: {
+    averageReviewTime: number;
+    applicationAcceptanceRate: number;
+    conferenceCompletionRate: number;
+    userEngagementRate: number;
+  };
+}
+
+export interface TimeSeriesData {
+  date: string;
+  value: number;
+  label?: string;
+}
+
+export interface RoleDistribution {
+  role: UserRole;
+  count: number;
+  percentage: number;
+}
+
+export interface OrganizationDistribution {
+  organization: string;
+  count: number;
+  percentage: number;
+}
+
+export interface ThemeDistribution {
+  theme: ConferenceTheme;
+  count: number;
+  percentage: number;
+}
+
+// ДОБАВЛЕНО: Состояния UI
+export interface UIState {
+  loading: boolean;
+  error: string | null;
+  selectedItems: string[];
+  filters: Record<string, any>;
+  sortBy: string;
+  sortOrder: "asc" | "desc";
+  currentPage: number;
+  itemsPerPage: number;
+}
+
+// ДОБАВЛЕНО: Модальные окна
+export interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title?: string;
+  size?: "sm" | "md" | "lg" | "xl" | "full";
+}
+
+// ДОБАВЛЕНО: Формы
+export interface FormState<T> {
+  data: T;
+  errors: Record<keyof T, string>;
+  touched: Record<keyof T, boolean>;
+  isSubmitting: boolean;
+  isValid: boolean;
+}
+
+export interface StatsFilters {
+  organizerId?: string;
+  userId?: string;
+  participantId?: string; // ИСПРАВЛЕНИЕ: Добавлен participantId
+  reviewerId?: string; // ДОБАВЛЕНО: Для рецензентов
+  dateFrom?: string;
+  dateTo?: string;
+  conferenceId?: string;
+  role?: UserRole;
+  theme?: ConferenceTheme;
+  status?: ApplicationStatus;
+  // Дополнительные фильтры
+  applicationStatus?: ApplicationStatus[];
+  conferenceThemes?: ConferenceTheme[];
+  timeRange?: "day" | "week" | "month" | "quarter" | "year";
+  includeInactive?: boolean;
+}
+
+// ДОБАВЛЕНО: Пропсы для компонента DashboardStats
+export interface DashboardStatsProps {
+  stats?: DashboardStats;
+  filters?: StatsFilters;
+  showDetailedView?: boolean;
+  variant?: "admin" | "organizer" | "participant" | "reviewer";
+}
+
+// ОБНОВЛЕНО: Расширенная статистика с дополнительными метриками
+export interface DashboardStats {
+  totalUsers: number;
+  activeUsers: number;
+  totalConferences: number;
+  publishedConferences: number;
+  totalApplications: number;
+  pendingApplications: number;
+  acceptedApplications: number;
+  rejectedApplications: number;
+
+  // Дополнительная статистика
+  newUsersThisMonth: number;
+  newConferencesThisMonth: number;
+  newApplicationsThisMonth: number;
+  systemHealth: number;
+  storageUsed: number;
+
+  // Дополнительные метрики для разных ролей
+  averageReviewTime?: number;
+  certificatesIssued?: number;
+  activeReviewers?: number;
+  completedConferences?: number;
+  upcomingDeadlines?: number;
+  overdueReviews?: number;
+
+  // Метрики качества
+  acceptanceRate?: number;
+  participationRate?: number;
+  satisfactionScore?: number;
+
+  // Финансовые метрики
+  totalRevenue?: number;
+  averageRegistrationFee?: number;
+
+  // Метрики времени
+  averageApplicationProcessingTime?: number;
+  averageConferenceDuration?: number;
+}
+
+// ДОБАВЛЕНО: Статистика по периодам
+export interface PeriodStats {
+  period: string; // например "2024-01", "2024-Q1", "2024"
+  stats: DashboardStats;
+}
+
+// ДОБАВЛЕНО: Сравнительная статистика
+export interface ComparativeStats {
+  current: DashboardStats;
+  previous: DashboardStats;
+  growthRates: {
+    users: number;
     conferences: number;
     applications: number;
-  }[];
+    revenue?: number;
+  };
 }
 
-// Фильтры для конференций
-export interface ConferenceFilters {
-  theme?: ConferenceTheme[];
-  participationType?: ParticipationType[];
-  dateFrom?: string;
-  dateTo?: string;
-  searchTerm?: string;
-  organizerId?: string;
-  isPublished?: boolean;
+// ДОБАВЛЕНО: Контекст для статистики (для определения, что показывать)
+export interface StatsContext {
+  userRole: UserRole;
+  userId: string;
+  organizationId?: string;
+  permissions: string[];
+  timeZone: string;
+  dateFormat: string;
 }
 
-// Фильтры для заявок
-export interface ApplicationFilters {
-  status?: ApplicationStatus[];
-  conferenceId?: string;
-  participantId?: string;
-  hasPresentation?: boolean;
-  presentationType?: PresentationType[];
-  dateFrom?: string;
-  dateTo?: string;
-  searchTerm?: string;
-  assignedReviewerId?: string;
+// ДОБАВЛЕНО: Настройки отображения статистики
+export interface StatsDisplaySettings {
+  showGrowthRates: boolean;
+  showComparisons: boolean;
+  defaultPeriod: "week" | "month" | "quarter" | "year";
+  refreshInterval: number; // в секундах
+  enableRealTime: boolean;
+  charts: {
+    showTrendLines: boolean;
+    showPredictions: boolean;
+    animateChanges: boolean;
+  };
 }
 
-// Утилитарные функции
-export const getRoleLabel = (role: UserRole): string => {
-  return UserRoleLabels[role] || role;
-};
+export interface ParticipantStatsFilters extends StatsFilters {
+  participantId: string;
+  applicationStatuses?: ApplicationStatus[];
+  conferenceTypes?: ParticipationType[];
+  showOnlyAccepted?: boolean;
+  showUpcoming?: boolean;
+}
 
-export const getRoleColor = (role: UserRole): string => {
-  return UserRoleColors[role] || "bg-gray-100 text-gray-800";
-};
+export interface OrganizerStatsFilters extends StatsFilters {
+  organizerId: string;
+  includeUnpublished?: boolean;
+  conferenceStatus?: "active" | "upcoming" | "completed" | "all";
+}
 
-export const getStatusLabel = (status: ApplicationStatus): string => {
-  return ApplicationStatusLabels[status] || status;
-};
+export interface ReviewerStatsFilters extends StatsFilters {
+  reviewerId: string;
+  assignedOnly?: boolean;
+  reviewStatus?: "pending" | "completed" | "overdue" | "all";
+}
 
-export const getStatusColor = (status: ApplicationStatus): string => {
-  return (
-    ApplicationStatusColors[status] ||
-    "bg-gray-100 text-gray-800 border-gray-200"
-  );
-};
-
-export const getThemeLabel = (theme: ConferenceTheme): string => {
-  return ConferenceThemeLabels[theme] || theme;
-};
-
-export const getParticipationTypeLabel = (type: ParticipationType): string => {
-  return ParticipationTypeLabels[type] || type;
-};
-
-export const getPresentationTypeLabel = (type: PresentationType): string => {
-  return PresentationTypeLabels[type] || type;
-};
-
-// Проверка прав доступа
-export const canManageConferences = (userRole: UserRole): boolean => {
-  return [UserRole.SUPER_ADMIN, UserRole.ORGANIZER].includes(userRole);
-};
-
-export const canReviewApplications = (userRole: UserRole): boolean => {
-  return [UserRole.SUPER_ADMIN, UserRole.ORGANIZER, UserRole.REVIEWER].includes(
-    userRole
-  );
-};
-
-export const canViewAllApplications = (userRole: UserRole): boolean => {
-  return [UserRole.SUPER_ADMIN, UserRole.ORGANIZER].includes(userRole);
-};
-
-export const canSubmitApplications = (userRole: UserRole): boolean => {
-  return [
-    UserRole.SUPER_ADMIN,
-    UserRole.ORGANIZER,
-    UserRole.PARTICIPANT,
-  ].includes(userRole);
-};
-
-export const canManageUsers = (userRole: UserRole): boolean => {
-  return [UserRole.SUPER_ADMIN].includes(userRole);
-};
+export interface AdminStatsFilters extends StatsFilters {
+  globalView?: boolean;
+  organizationFilter?: string;
+  roleFilter?: UserRole[];
+}
