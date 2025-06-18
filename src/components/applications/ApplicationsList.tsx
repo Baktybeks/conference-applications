@@ -6,6 +6,7 @@ import {
   ApplicationStatus,
   PresentationType,
   ApplicationFilters,
+  Conference,
 } from "@/types";
 import { Button } from "@/components/ui/Button";
 import {
@@ -13,40 +14,38 @@ import {
   User,
   Calendar,
   Clock,
-  Filter,
   Search,
-  Edit,
   Eye,
-  Plus,
   Check,
   X,
   Loader2,
   MessageSquare,
 } from "lucide-react";
 
-// ИСПРАВЛЕНИЕ: Обновленный интерфейс с поддержкой реальных действий
+// ИСПРАВЛЕНИЕ: Обновленный интерфейс с поддержкой конференций
 interface ApplicationsListProps {
   onApplicationClick: (application: ConferenceApplication) => void;
   onApplicationReview?: (application: ConferenceApplication) => void;
   onApplicationAccept?: (
     applicationId: string,
     comments?: string
-  ) => Promise<void>; // ДОБАВЛЕНО
+  ) => Promise<void>;
   onApplicationReject?: (
     applicationId: string,
     comments?: string
-  ) => Promise<void>; // ДОБАВЛЕНО
+  ) => Promise<void>;
   onApplicationWaitlist?: (
     applicationId: string,
     comments?: string
-  ) => Promise<void>; // ДОБАВЛЕНО
+  ) => Promise<void>;
   showFilters?: boolean;
   showOrganizerActions?: boolean;
   initialFilters?: Partial<ApplicationFilters>;
   variant?: "admin" | "organizer" | "participant" | "reviewer";
-  applications?: ConferenceApplication[]; // Реальные данные из API
+  applications?: ConferenceApplication[];
+  conferences?: Conference[]; // ДОБАВЛЕНО: массив конференций
   showCreateButton?: boolean;
-  isLoading?: boolean; // ДОБАВЛЕНО: состояние загрузки
+  isLoading?: boolean;
 }
 
 export function ApplicationsList({
@@ -59,10 +58,35 @@ export function ApplicationsList({
   showOrganizerActions = false,
   initialFilters = {},
   variant = "admin",
-  applications = [], // ИСПРАВЛЕНИЕ: По умолчанию пустой массив
+  applications = [],
+  conferences = [], // ДОБАВЛЕНО: по умолчанию пустой массив
   showCreateButton = false,
   isLoading = false,
 }: ApplicationsListProps) {
+  // ДОБАВЛЕНО: Создаем lookup карту конференций
+  const conferencesMap = useMemo(() => {
+    const map = new Map<string, Conference>();
+    conferences.forEach((conference) => {
+      map.set(conference.$id, conference);
+    });
+    return map;
+  }, [conferences]);
+  console.log(
+    conferencesMap,
+    "conferencesMap************************************"
+  );
+
+  // ДОБАВЛЕНО: Функция для получения названия конференции
+  const getConferenceTitle = (conferenceId: string): string => {
+    const conference = conferencesMap.get(conferenceId);
+    console.log(
+      conference,
+      "9999999999999999999999999999999999999999999999++++++++++++++++++++++++++++++++++++++++"
+    );
+
+    return conference?.title || `Конференция #${conferenceId.slice(-6)}`;
+  };
+
   // Мемоизируем initialFilters для избежания бесконечного цикла
   const memoizedInitialFilters = useMemo(
     () => initialFilters,
@@ -90,7 +114,7 @@ export function ApplicationsList({
   const [searchQuery, setSearchQuery] = useState(filters.searchQuery || "");
   const [processingApplications, setProcessingApplications] = useState<
     Record<string, string>
-  >({}); // ДОБАВЛЕНО: отслеживание обработки
+  >({});
 
   // Применяем начальные фильтры при изменении initialFilters
   useEffect(() => {
@@ -103,7 +127,7 @@ export function ApplicationsList({
   const shouldShowReviewActions =
     (onApplicationAccept || onApplicationReject) && !isParticipantView;
 
-  // ИСПРАВЛЕНИЕ: Функция фильтрации заявок - теперь работает с реальными данными
+  // ИСПРАВЛЕНИЕ: Функция фильтрации заявок с поиском по названию конференции
   const getFilteredApplications = (): ConferenceApplication[] => {
     return applications.filter((application) => {
       // Фильтр по участнику
@@ -122,13 +146,18 @@ export function ApplicationsList({
         return false;
       }
 
-      // Фильтр по поисковому запросу
+      // ИСПРАВЛЕНИЕ: Фильтр по поисковому запросу включает название конференции
       if (filters.searchQuery) {
         const query = filters.searchQuery.toLowerCase();
+        const conferenceTitle = getConferenceTitle(
+          application.conferenceId
+        ).toLowerCase();
+
         if (
           !application.fullName.toLowerCase().includes(query) &&
           !application.organization.toLowerCase().includes(query) &&
           !application.presentationTitle.toLowerCase().includes(query) &&
+          !conferenceTitle.includes(query) &&
           !application.keywords.some((keyword) =>
             keyword.toLowerCase().includes(query)
           )
@@ -181,7 +210,7 @@ export function ApplicationsList({
 
   const filteredApplications = getFilteredApplications();
 
-  // ДОБАВЛЕНО: Обработчики действий с заявками
+  // Обработчики действий с заявками
   const handleAcceptApplication = async (applicationId: string) => {
     if (!onApplicationAccept) return;
 
@@ -242,7 +271,7 @@ export function ApplicationsList({
     }
   };
 
-  // ДОБАВЛЕНО: Функция для определения доступных действий
+  // Функция для определения доступных действий
   const getAvailableActions = (application: ConferenceApplication) => {
     const canAccept =
       application.status === ApplicationStatus.SUBMITTED ||
@@ -336,7 +365,7 @@ export function ApplicationsList({
     }
   };
 
-  // ДОБАВЛЕНО: Показ состояния загрузки
+  // Показ состояния загрузки
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -522,8 +551,14 @@ export function ApplicationsList({
                       <div className="text-sm text-gray-900">
                         {isParticipantView ? (
                           <>
-                            <div className="font-medium">
-                              Конференция #{application.fullName}
+                            {/* ИСПРАВЛЕНИЕ: Показываем реальное название конференции */}
+                            <div
+                              className="font-medium"
+                              title={getConferenceTitle(
+                                application.conferenceId
+                              )}
+                            >
+                              {getConferenceTitle(application.conferenceId)}
                             </div>
                             <div className="text-gray-500 text-xs">
                               {application.hasPresentation
@@ -585,7 +620,7 @@ export function ApplicationsList({
                           {isParticipantView ? "Просмотр" : "Детали"}
                         </Button>
 
-                        {/* ИСПРАВЛЕНИЕ: Кнопки действий только для админов и организаторов */}
+                        {/* Кнопки действий только для админов и организаторов */}
                         {shouldShowReviewActions && (
                           <>
                             {actions.canAccept && (
