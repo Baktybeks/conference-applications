@@ -105,9 +105,8 @@ export default function ParticipantPage() {
   const handleApplicationModalClose = useCallback(() => {
     setIsApplicationModalOpen(false);
     setSelectedConference(null);
-    // Обновляем данные после создания заявки
-    refetchApplications();
-  }, [refetchApplications]);
+    // Обновление заявок теперь происходит в onSuccess модального окна
+  }, []);
 
   // УСЛОВНЫЕ ПРОВЕРКИ ПОСЛЕ ВСЕХ ХУКОВ
   if (loading) {
@@ -371,10 +370,12 @@ export default function ParticipantPage() {
           isOpen={isApplicationModalOpen}
           onClose={handleApplicationModalClose}
           conference={selectedConference}
-          participantId={user.$id}
-          userEmail={user.email}
-          userName={user.name}
-          userOrganization={user.organization}
+          onSuccess={() => {
+            // Обновляем заявки после успешного создания
+            refetchApplications();
+            // Закрываем модальное окно
+            handleApplicationModalClose();
+          }}
         />
       )}
     </Layout>

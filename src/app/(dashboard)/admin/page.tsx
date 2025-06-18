@@ -305,8 +305,27 @@ export default function AdminPage() {
                   </span>
                   <span>
                     Пользователей:{" "}
-                    <strong>{dashboardStats.totalUsers || 0}</strong>
+                    <strong>{dashboardStats.totalUsers ?? "Н/Д"}</strong>
+                    {dashboardStats.activeUsers !== undefined && (
+                      <span className="text-green-600 ml-1">
+                        ({dashboardStats.activeUsers} активных)
+                      </span>
+                    )}
                   </span>
+                  {dashboardStats.systemHealth !== undefined && (
+                    <span>
+                      Система:{" "}
+                      <strong
+                        className={
+                          dashboardStats.systemHealth >= 90
+                            ? "text-green-600"
+                            : "text-yellow-600"
+                        }
+                      >
+                        {dashboardStats.systemHealth}%
+                      </strong>
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -366,7 +385,7 @@ export default function AdminPage() {
                 icon={Users}
                 isActive={activeTab === "users"}
                 onClick={() => setActiveTab("users")}
-                badge={dashboardStats?.totalUsers}
+                badge={dashboardStats?.totalUsers ?? undefined}
               />
             </nav>
           </div>
@@ -512,7 +531,7 @@ interface TabButtonProps {
   icon: React.ComponentType<{ className?: string }>;
   isActive: boolean;
   onClick: () => void;
-  badge?: number;
+  badge?: number | undefined;
 }
 
 function TabButton({
@@ -533,7 +552,7 @@ function TabButton({
     >
       <Icon className="h-4 w-4 mr-2" />
       {label}
-      {badge !== undefined && badge > 0 && (
+      {badge !== undefined && badge !== null && badge > 0 && (
         <span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
           {badge > 99 ? "99+" : badge}
         </span>

@@ -1,25 +1,33 @@
-// src/components/applications/CreateApplicationModal.tsx
+// src/components/applications/CreateApplicationModal.tsx - ИСПРАВЛЕННАЯ ВЕРСИЯ
+
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Modal, ModalFooter } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
+import React, { useState } from "react";
+import { ApplicationForm } from "./ApplicationForm";
+import { useAuth } from "@/hooks/useAuth";
 import {
   useCreateApplication,
-  CreateApplicationData,
+  // ИСПРАВЛЕНИЕ: Убираем импорт CreateApplicationData
 } from "@/services/applicationService";
-import { Conference, PresentationType } from "@/types";
 import {
-  FileText,
+  Conference,
+  PresentationType,
+  CreateApplicationDto, // ДОБАВЛЕНО: правильный тип из @/types
+} from "@/types";
+import {
   User,
   Building,
   Mail,
   Phone,
+  FileText,
   Presentation,
-  Plus,
+  Tag,
+  Info,
+  Calendar,
+  MapPin,
+  AlertCircle,
+  Save,
+  Send,
   X,
 } from "lucide-react";
 
@@ -27,439 +35,62 @@ interface CreateApplicationModalProps {
   isOpen: boolean;
   onClose: () => void;
   conference: Conference;
-  participantId: string;
-  userEmail?: string;
-  userName?: string;
-  userOrganization?: string;
+  onSuccess?: () => void;
 }
-
-interface FormData {
-  fullName: string;
-  organization: string;
-  position: string;
-  email: string;
-  phone: string;
-  hasPresentation: boolean;
-  presentationType: PresentationType | "";
-  presentationTitle: string;
-  abstract: string;
-  keywords: string[];
-  dietaryRestrictions: string;
-  accessibilityNeeds: string;
-  accommodationNeeded: boolean;
-}
-
-const PRESENTATION_TYPE_OPTIONS = [
-  { value: PresentationType.ORAL, label: "Устный доклад" },
-  { value: PresentationType.POSTER, label: "Постерная презентация" },
-  { value: PresentationType.WORKSHOP, label: "Мастер-класс" },
-  { value: PresentationType.KEYNOTE, label: "Пленарный доклад" },
-  { value: PresentationType.PANEL, label: "Панельная дискуссия" },
-];
 
 export function CreateApplicationModal({
   isOpen,
   onClose,
   conference,
-  participantId,
-  userEmail = "",
-  userName = "",
-  userOrganization = "",
+  onSuccess,
 }: CreateApplicationModalProps) {
-  const createApplicationMutation = useCreateApplication();
+  const { user } = useAuth();
 
-  const [formData, setFormData] = useState<FormData>({
-    fullName: userName,
-    organization: userOrganization,
-    position: "",
-    email: userEmail,
-    phone: "",
-    hasPresentation: false,
-    presentationType: "",
-    presentationTitle: "",
-    abstract: "",
-    keywords: [],
-    dietaryRestrictions: "",
-    accessibilityNeeds: "",
-    accommodationNeeded: false,
-  });
+  if (!isOpen) return null;
 
-  const [keywordInput, setKeywordInput] = useState("");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Сброс формы при открытии модального окна
-  useEffect(() => {
-    if (isOpen) {
-      setFormData({
-        fullName: userName,
-        organization: userOrganization,
-        position: "",
-        email: userEmail,
-        phone: "",
-        hasPresentation: false,
-        presentationType: "",
-        presentationTitle: "",
-        abstract: "",
-        keywords: [],
-        dietaryRestrictions: "",
-        accessibilityNeeds: "",
-        accommodationNeeded: false,
-      });
-      setKeywordInput("");
-      setErrors({});
-    }
-  }, [isOpen, userName, userEmail, userOrganization]);
-
-  const handleInputChange = (field: keyof FormData, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    // Очищаем ошибку для поля при изменении
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
-    }
-  };
-
-  const handleAddKeyword = () => {
-    if (
-      keywordInput.trim() &&
-      !formData.keywords.includes(keywordInput.trim())
-    ) {
-      setFormData((prev) => ({
-        ...prev,
-        keywords: [...prev.keywords, keywordInput.trim()],
-      }));
-      setKeywordInput("");
-    }
-  };
-
-  const handleRemoveKeyword = (keyword: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      keywords: prev.keywords.filter((k) => k !== keyword),
-    }));
-  };
-
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = "Полное имя обязательно";
-    }
-
-    if (!formData.organization.trim()) {
-      newErrors.organization = "Организация обязательна";
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email обязателен";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Неверный формат email";
-    }
-
-    if (formData.hasPresentation) {
-      if (!formData.presentationType) {
-        newErrors.presentationType = "Выберите тип презентации";
-      }
-      if (!formData.presentationTitle.trim()) {
-        newErrors.presentationTitle = "Название презентации обязательно";
-      }
-      if (!formData.abstract.trim()) {
-        newErrors.abstract = "Аннотация обязательна";
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    const applicationData: CreateApplicationData = {
-      conferenceId: conference.$id,
-      participantId,
-      fullName: formData.fullName,
-      organization: formData.organization,
-      position: formData.position || undefined,
-      email: formData.email,
-      phone: formData.phone || undefined,
-      hasPresentation: formData.hasPresentation,
-      presentationType: formData.presentationType || undefined,
-      presentationTitle: formData.presentationTitle || undefined,
-      abstract: formData.abstract || undefined,
-      keywords: formData.keywords.length > 0 ? formData.keywords : undefined,
-      dietaryRestrictions: formData.dietaryRestrictions || undefined,
-      accessibilityNeeds: formData.accessibilityNeeds || undefined,
-      accommodationNeeded: formData.accommodationNeeded,
-      $createdAt: new Date().toISOString(),
-    };
-
-    try {
-      await createApplicationMutation.mutateAsync(applicationData);
-      onClose();
-    } catch (error) {
-      console.error("Ошибка создания заявки:", error);
-    }
+  const handleSuccess = () => {
+    onSuccess?.();
+    onClose();
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`Подача заявки на "${conference.title}"`}
-      size="lg"
-    >
-      <div className="space-y-6">
-        {/* Информация о конференции */}
-        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-          <h4 className="text-sm font-medium text-blue-900 mb-2">
-            Информация о конференции
-          </h4>
-          <div className="text-sm text-blue-800 space-y-1">
-            <p>
-              <strong>Место:</strong> {conference.location}
-            </p>
-            <p>
-              <strong>Даты:</strong>{" "}
-              {new Date(conference.startDate).toLocaleDateString("ru-RU")} -{" "}
-              {new Date(conference.endDate).toLocaleDateString("ru-RU")}
-            </p>
-            <p>
-              <strong>Дедлайн подачи заявок:</strong>{" "}
-              {new Date(conference.submissionDeadline).toLocaleDateString(
-                "ru-RU"
-              )}
-            </p>
-            {conference.registrationFee > 0 && (
-              <p>
-                <strong>Регистрационный взнос:</strong>{" "}
-                {conference.registrationFee.toLocaleString()} сом
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Заголовок модального окна */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Подача заявки на участие
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Содержимое */}
+        <div className="p-6">
+          {user ? (
+            <ApplicationForm
+              conference={conference}
+              mode="create"
+              onSuccess={handleSuccess}
+              onCancel={onClose}
+            />
+          ) : (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Необходима авторизация
+              </h3>
+              <p className="text-gray-600">
+                Для подачи заявки необходимо войти в систему
               </p>
-            )}
-          </div>
-        </div>
-
-        {/* Основная информация */}
-        <div className="space-y-4">
-          <h4 className="text-lg font-medium text-gray-900 flex items-center">
-            <User className="h-5 w-5 mr-2" />
-            Личная информация
-          </h4>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Полное имя *"
-              value={formData.fullName}
-              onChange={(e) => handleInputChange("fullName", e.target.value)}
-              error={errors.fullName}
-              icon={User}
-            />
-
-            <Input
-              label="Email *"
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleInputChange("email", e.target.value)}
-              error={errors.email}
-              icon={Mail}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Организация *"
-              value={formData.organization}
-              onChange={(e) =>
-                handleInputChange("organization", e.target.value)
-              }
-              error={errors.organization}
-              icon={Building}
-            />
-
-            <Input
-              label="Должность"
-              value={formData.position}
-              onChange={(e) => handleInputChange("position", e.target.value)}
-            />
-          </div>
-
-          <Input
-            label="Телефон"
-            value={formData.phone}
-            onChange={(e) => handleInputChange("phone", e.target.value)}
-            icon={Phone}
-          />
-        </div>
-
-        {/* Информация о презентации */}
-        <div className="space-y-4">
-          <h4 className="text-lg font-medium text-gray-900 flex items-center">
-            <Presentation className="h-5 w-5 mr-2" />
-            Презентация
-          </h4>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="hasPresentation"
-              checked={formData.hasPresentation}
-              onChange={(e) =>
-                handleInputChange("hasPresentation", e.target.checked)
-              }
-              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-            />
-            <label
-              htmlFor="hasPresentation"
-              className="ml-2 text-sm text-gray-900"
-            >
-              Я планирую выступить с презентацией
-            </label>
-          </div>
-
-          {formData.hasPresentation && (
-            <div className="space-y-4 ml-6 pl-4 border-l-2 border-indigo-200">
-              <Select
-                label="Тип презентации *"
-                value={formData.presentationType}
-                onChange={(e) =>
-                  handleInputChange("presentationType", e.target.value)
-                }
-                options={PRESENTATION_TYPE_OPTIONS}
-                placeholder="Выберите тип презентации"
-                error={errors.presentationType}
-              />
-
-              <Input
-                label="Название презентации *"
-                value={formData.presentationTitle}
-                onChange={(e) =>
-                  handleInputChange("presentationTitle", e.target.value)
-                }
-                error={errors.presentationTitle}
-              />
-
-              <Textarea
-                label="Аннотация *"
-                value={formData.abstract}
-                onChange={(e) => handleInputChange("abstract", e.target.value)}
-                error={errors.abstract}
-                rows={4}
-                placeholder="Краткое описание вашей презентации..."
-              />
-
-              {/* Ключевые слова */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ключевые слова
-                </label>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    value={keywordInput}
-                    onChange={(e) => setKeywordInput(e.target.value)}
-                    placeholder="Введите ключевое слово"
-                    className="flex-1"
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddKeyword();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddKeyword}
-                    icon={Plus}
-                  >
-                    Добавить
-                  </Button>
-                </div>
-                {formData.keywords.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {formData.keywords.map((keyword) => (
-                      <span
-                        key={keyword}
-                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
-                      >
-                        {keyword}
-                        <button
-                          onClick={() => handleRemoveKeyword(keyword)}
-                          className="ml-1 text-indigo-600 hover:text-indigo-800"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           )}
         </div>
-
-        {/* Дополнительные требования */}
-        <div className="space-y-4">
-          <h4 className="text-lg font-medium text-gray-900">
-            Дополнительные требования
-          </h4>
-
-          <Textarea
-            label="Пищевые ограничения"
-            value={formData.dietaryRestrictions}
-            onChange={(e) =>
-              handleInputChange("dietaryRestrictions", e.target.value)
-            }
-            rows={2}
-            placeholder="Укажите любые пищевые аллергии или ограничения..."
-          />
-
-          <Textarea
-            label="Потребности в доступности"
-            value={formData.accessibilityNeeds}
-            onChange={(e) =>
-              handleInputChange("accessibilityNeeds", e.target.value)
-            }
-            rows={2}
-            placeholder="Укажите любые потребности в доступности..."
-          />
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="accommodationNeeded"
-              checked={formData.accommodationNeeded}
-              onChange={(e) =>
-                handleInputChange("accommodationNeeded", e.target.checked)
-              }
-              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-            />
-            <label
-              htmlFor="accommodationNeeded"
-              className="ml-2 text-sm text-gray-900"
-            >
-              Мне нужна помощь с размещением
-            </label>
-          </div>
-        </div>
       </div>
-
-      <ModalFooter>
-        <Button
-          variant="outline"
-          onClick={onClose}
-          disabled={createApplicationMutation.isPending}
-        >
-          Отмена
-        </Button>
-        <Button
-          variant="primary"
-          onClick={handleSubmit}
-          loading={createApplicationMutation.isPending}
-          icon={FileText}
-        >
-          Подать заявку
-        </Button>
-      </ModalFooter>
-    </Modal>
+    </div>
   );
 }

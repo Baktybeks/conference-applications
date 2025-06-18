@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createApplication,
   updateApplication,
-  updateApplicationStatus, // ДОБАВЛЕНО: импорт реальной функции
+  updateApplicationStatus,
   getApplications,
   getUserById,
 } from "@/services/appwriteService";
@@ -13,33 +13,22 @@ import {
   ApplicationStatus,
   PresentationType,
   ApplicationFilters,
+  CreateApplicationDto,
+  UpdateApplicationDto,
 } from "@/types";
 import { toast } from "react-toastify";
 
-// Типы для создания и обновления заявок
-export interface CreateApplicationData {
-  conferenceId: string;
+// ИСПРАВЛЕНИЕ: Используем CreateApplicationDto вместо CreateApplicationData
+export interface CreateApplicationParams {
+  data: CreateApplicationDto;
   participantId: string;
-  fullName: string;
-  organization: string;
-  position?: string;
-  email: string;
-  phone?: string;
-  hasPresentation: boolean;
-  presentationType?: PresentationType;
-  presentationTitle?: string;
-  abstract?: string;
-  keywords?: string[];
-  dietaryRestrictions?: string;
-  accessibilityNeeds?: string;
-  accommodationNeeded?: boolean;
-  $createdAt: string;
+  isDraft: boolean;
 }
 
-export interface UpdateApplicationData extends Partial<CreateApplicationData> {
-  status?: ApplicationStatus;
-  reviewerComments?: string;
-  assignedReviewerId?: string;
+// ИСПРАВЛЕНИЕ: Используем UpdateApplicationDto вместо UpdateApplicationData
+export interface UpdateApplicationParams {
+  applicationId: string;
+  data: UpdateApplicationDto;
 }
 
 // Хук для создания заявки
@@ -51,35 +40,33 @@ export function useCreateApplication() {
       data,
       participantId,
       isDraft,
-    }: {
-      data: CreateApplicationData;
-      participantId: string;
-      isDraft: boolean;
-    }) => {
-      // ИСПРАВЛЕНИЕ: Правильно формируем объект заявки с учетом типизации
+    }: CreateApplicationParams) => {
+      // ИСПРАВЛЕНИЕ: Правильно формируем объект заявки
       const applicationData: Omit<ConferenceApplication, "$id" | "$updatedAt"> =
         {
-          ...data,
-          participantId,
-          status: isDraft
-            ? ApplicationStatus.DRAFT
-            : ApplicationStatus.SUBMITTED,
+          // Поля из CreateApplicationDto
           conferenceId: data.conferenceId,
           fullName: data.fullName,
           organization: data.organization,
-          position: data.position || "", // ИСПРАВЛЕНИЕ: Устанавливаем пустую строку если undefined
+          position: data.position || "",
           email: data.email,
-          phone: data.phone || "", // ИСПРАВЛЕНИЕ: Устанавливаем пустую строку если undefined
+          phone: data.phone || "",
           hasPresentation: data.hasPresentation,
-          presentationType: data.presentationType || undefined,
+          presentationType: data.presentationType,
           presentationTitle: data.presentationTitle || "",
           abstract: data.abstract || "",
           keywords: data.keywords || [],
           dietaryRestrictions: data.dietaryRestrictions || "",
           accessibilityNeeds: data.accessibilityNeeds || "",
           accommodationNeeded: data.accommodationNeeded || false,
+
+          // Поля, добавляемые сервисом
+          participantId,
+          status: isDraft
+            ? ApplicationStatus.DRAFT
+            : ApplicationStatus.SUBMITTED,
           attended: false,
-          $createdAt: data.$createdAt,
+          $createdAt: new Date().toISOString(),
         };
 
       return await createApplication(applicationData);
@@ -110,14 +97,7 @@ export function useUpdateApplication() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      applicationId,
-      data,
-    }: {
-      applicationId: string;
-      data: UpdateApplicationData;
-    }) => {
-      // ИСПРАВЛЕНИЕ: Используем реальную функцию updateApplication
+    mutationFn: async ({ applicationId, data }: UpdateApplicationParams) => {
       return await updateApplication(applicationId, data);
     },
     onSuccess: (data, variables) => {
@@ -143,7 +123,6 @@ export function useApplications(filters?: ApplicationFilters) {
   return useQuery({
     queryKey: ["applications", filters],
     queryFn: async () => {
-      // TODO: Передать фильтры в getApplications
       const applications = await getApplications();
 
       // Применяем фильтры на клиенте (временно)
@@ -180,7 +159,6 @@ export function useApplication(applicationId: string) {
   return useQuery({
     queryKey: ["application", applicationId],
     queryFn: async () => {
-      // TODO: Реализовать getApplicationById в appwriteService
       const applications = await getApplications();
       const application = applications.find((app) => app.$id === applicationId);
 
@@ -210,7 +188,6 @@ export function useSubmitApplication() {
 
   return useMutation({
     mutationFn: async (applicationId: string) => {
-      // ИСПРАВЛЕНИЕ: Используем реальную функцию updateApplicationStatus
       return await updateApplicationStatus(
         applicationId,
         ApplicationStatus.SUBMITTED
@@ -231,7 +208,7 @@ export function useSubmitApplication() {
   });
 }
 
-// ИСПРАВЛЕНИЕ: Хук для принятия/отклонения заявки (для организаторов)
+// Хук для принятия/отклонения заявки (для организаторов)
 export function useReviewApplication() {
   const queryClient = useQueryClient();
 
@@ -249,13 +226,11 @@ export function useReviewApplication() {
         | ApplicationStatus.UNDER_REVIEW;
       comments?: string;
     }) => {
-      // ИСПРАВЛЕНИЕ: Используем реальную функцию updateApplicationStatus вместо заглушки
       console.log("Рецензирование заявки:", applicationId, status, comments);
 
       return await updateApplicationStatus(applicationId, status, comments);
     },
     onSuccess: (data) => {
-      // Инвалидируем все связанные кеши
       queryClient.invalidateQueries({ queryKey: ["applications"] });
       queryClient.invalidateQueries({ queryKey: ["application", data?.$id] });
       queryClient.invalidateQueries({ queryKey: ["application-stats"] });

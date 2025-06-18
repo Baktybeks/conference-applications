@@ -260,14 +260,20 @@ export function OrganizerConferencesView({
                         size="sm"
                         icon={Eye}
                         onClick={() => onConferenceClick?.(conference)}
-                      />
+                      >
+                        {""}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         icon={Edit}
                         onClick={() => onConferenceEdit?.(conference)}
-                      />
-                      <Button variant="ghost" size="sm" icon={MoreVertical} />
+                      >
+                        {""}
+                      </Button>
+                      <Button variant="ghost" size="sm" icon={MoreVertical}>
+                        {""}
+                      </Button>
                     </div>
                   </div>
 
